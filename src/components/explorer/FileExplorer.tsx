@@ -132,6 +132,7 @@ export default function FileExplorer() {
     targetFolderId: Id<"folders"> | undefined
   ) {
     e.preventDefault();
+    e.stopPropagation();
     setDragOverId(null);
     try {
       const data = JSON.parse(e.dataTransfer.getData("text/plain"));
@@ -255,7 +256,7 @@ export default function FileExplorer() {
         ))}
 
         {/* Inline create form */}
-        {creatingIn?.parentId === parentId && (
+        {creatingIn && creatingIn.parentId === parentId && (
           <div
             className="flex items-center gap-1 px-2 py-1"
             style={{ paddingLeft: `${(depth + (parentId ? 0 : 0)) * 16}px` }}
@@ -369,7 +370,7 @@ export default function FileExplorer() {
         onDragLeave={() => setDragOverId(null)}
         onDrop={(e) => handleDrop(e, undefined)}
       >
-        {folders && notes && folders.length === 0 && notes.length === 0 ? (
+        {folders && notes && folders.length === 0 && notes.length === 0 && !creatingIn ? (
           <p className="text-center py-8 text-obsidian-text-muted text-xs">
             No files yet
           </p>
