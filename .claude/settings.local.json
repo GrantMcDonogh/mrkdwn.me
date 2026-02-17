@@ -3,7 +3,16 @@
     "allow": [
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git -C /home/grant/mrkdwn.me fetch --all)",
+      "Bash(git -C /home/grant/mrkdwn.me pull)",
+      "Bash(git -C /home/grant/mrkdwn.me log --oneline --all)",
+      "WebSearch",
+      "WebFetch(domain:docs.convex.dev)",
+      "WebFetch(domain:stack.convex.dev)"
     ]
   }
 }
