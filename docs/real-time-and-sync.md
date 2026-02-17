@@ -2,7 +2,7 @@
 
 ## Overview
 
-Obsidian Online leverages Convex's built-in real-time subscription system to keep all connected clients in sync without manual polling, WebSocket management, or complex state synchronization logic. Combined with the editor's auto-save mechanism, this creates a seamless experience where changes are persisted and reflected across the UI immediately.
+mrkdwn.me leverages Convex's built-in real-time subscription system to keep all connected clients in sync without manual polling, WebSocket management, or complex state synchronization logic. Combined with the editor's auto-save mechanism, this creates a seamless experience where changes are persisted and reflected across the UI immediately.
 
 ## Convex Real-Time Subscriptions
 
@@ -80,7 +80,7 @@ When the editor component unmounts (e.g., switching tabs, closing the note):
 
 ### Conflict Handling
 
-Since Obsidian Online is single-user (no collaborative editing):
+Since mrkdwn.me is single-user (no collaborative editing):
 
 - **No merge conflicts**: Only one client writes to a note at a time.
 - **Last write wins**: If the same note is open in two panes and edited simultaneously, the last save overwrites the previous one.

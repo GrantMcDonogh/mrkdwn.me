@@ -2,7 +2,7 @@
 
 ## Overview
 
-Obsidian Online provides three search and navigation mechanisms:
+mrkdwn.me provides three search and navigation mechanisms:
 
 1. **Search Panel** — Full-text search across note titles and content, with tag filtering.
 2. **Command Palette** — Quick access to application commands via keyboard shortcut.

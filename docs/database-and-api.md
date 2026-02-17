@@ -2,7 +2,7 @@
 
 ## Overview
 
-Obsidian Online uses [Convex](https://convex.dev) as its backend platform, providing a serverless document database, server-side functions (queries and mutations), real-time subscriptions, and authentication. The database schema is defined in `convex/schema.ts`, and all API functions are defined in the `convex/` directory.
+mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a serverless document database, server-side functions (queries and mutations), real-time subscriptions, and authentication. The database schema is defined in `convex/schema.ts`, and all API functions are defined in the `convex/` directory.
 
 ## Database Schema
 

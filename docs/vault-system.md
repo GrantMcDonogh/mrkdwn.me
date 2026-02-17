@@ -2,7 +2,7 @@
 
 ## Overview
 
-Vaults are the top-level organizational unit in Obsidian Online, mirroring the concept of vaults in the desktop Obsidian application. Each vault is an isolated workspace containing its own set of folders and notes. A user can create multiple vaults to separate different knowledge bases (e.g., "Work", "Personal", "Research").
+Vaults are the top-level organizational unit in mrkdwn.me, mirroring the concept of vaults in the desktop Obsidian application. Each vault is an isolated workspace containing its own set of folders and notes. A user can create multiple vaults to separate different knowledge bases (e.g., "Work", "Personal", "Research").
 
 ## Data Model
 

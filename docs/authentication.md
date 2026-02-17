@@ -2,7 +2,7 @@
 
 ## Overview
 
-Obsidian Online uses [Convex Auth](https://labs.convex.dev/auth) (`@convex-dev/auth`) for authentication, supporting both email/password credentials and Google OAuth. All backend operations require authentication — unauthenticated users are shown a sign-in page.
+mrkdwn.me uses [Convex Auth](https://labs.convex.dev/auth) (`@convex-dev/auth`) for authentication, supporting both email/password credentials and Google OAuth. All backend operations require authentication — unauthenticated users are shown a sign-in page.
 
 ## Providers
 
@@ -95,7 +95,7 @@ return <VaultSelector />;
 ### Layout
 
 - Centered card on a dark background (`bg-obsidian-bg`).
-- Application branding with the Obsidian Online logo and tagline.
+- Application branding with the mrkdwn.me logo and tagline.
 - Toggle between "Sign In" and "Sign Up" modes via a text link.
 
 ### Sign In / Sign Up Form

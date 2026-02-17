@@ -2,7 +2,7 @@
 
 ## Overview
 
-The workspace system manages the visual layout of Obsidian Online, including the sidebar, editor panes, tab bars, and right panels. It is powered by a React Context + `useReducer` pattern that provides a centralized, predictable state machine for all layout-related actions.
+The workspace system manages the visual layout of mrkdwn.me, including the sidebar, editor panes, tab bars, and right panels. It is powered by a React Context + `useReducer` pattern that provides a centralized, predictable state machine for all layout-related actions.
 
 ## State Management
 

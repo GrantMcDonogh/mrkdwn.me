@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Markdown editor is the core content creation and editing component of Obsidian Online. It is built on [CodeMirror 6](https://codemirror.net/), configured with a rich set of extensions for Markdown editing, syntax highlighting, live preview, wiki link support, and auto-save functionality.
+The Markdown editor is the core content creation and editing component of mrkdwn.me. It is built on [CodeMirror 6](https://codemirror.net/), configured with a rich set of extensions for Markdown editing, syntax highlighting, live preview, wiki link support, and auto-save functionality.
 
 ## Architecture
 

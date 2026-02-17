@@ -2,7 +2,7 @@
 
 ## Overview
 
-Wiki links are the primary mechanism for connecting notes in Obsidian Online. They use the `[[Note Title]]` syntax to create navigable links between notes. The backlinks feature surfaces all notes that link to a given note, enabling bidirectional knowledge navigation.
+Wiki links are the primary mechanism for connecting notes in mrkdwn.me. They use the `[[Note Title]]` syntax to create navigable links between notes. The backlinks feature surfaces all notes that link to a given note, enabling bidirectional knowledge navigation.
 
 ## Wiki Link Syntax
 

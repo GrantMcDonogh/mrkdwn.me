@@ -1,8 +1,8 @@
-# Obsidian Online - Project Overview
+# mrkdwn.me - Project Overview
 
 ## Summary
 
-Obsidian Online is a cloud-based knowledge management system inspired by [Obsidian](https://obsidian.md). It enables users to create, organize, and interlink Markdown notes in a real-time web application with features like wiki-style linking, a graph view of note relationships, backlinks, full-text search, and a command palette.
+mrkdwn.me is a cloud-based knowledge management system inspired by [Obsidian](https://obsidian.md). It enables users to create, organize, and interlink Markdown notes in a real-time web application with features like wiki-style linking, a graph view of note relationships, backlinks, full-text search, and a command palette.
 
 ## Tech Stack
 
