@@ -4,7 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
 import Sidebar from "./Sidebar";
 import TabBar from "./TabBar";
-import MarkdownEditor from "../editor/MarkdownEditor";
+import NoteView from "../editor/NoteView";
 import BacklinksPanel from "../backlinks/BacklinksPanel";
 import SearchPanel from "../search/SearchPanel";
 import GraphView from "../graph/GraphView";
@@ -44,8 +44,24 @@ export default function AppLayout() {
         setShowQuickSwitcher((v) => !v);
         setShowCommandPalette(false);
       }
+      if (mod && e.key === "e") {
+        e.preventDefault();
+        const activePane = state.panes.find(
+          (p) => p.id === state.activePaneId
+        );
+        const activeTab = activePane?.tabs.find(
+          (t) => t.id === activePane.activeTabId
+        );
+        if (activeTab?.type === "note") {
+          dispatch({
+            type: "TOGGLE_TAB_MODE",
+            paneId: activePane!.id,
+            tabId: activeTab.id,
+          });
+        }
+      }
     },
-    []
+    [state.panes, state.activePaneId, dispatch]
   );
 
   useEffect(() => {
@@ -87,7 +103,12 @@ export default function AppLayout() {
         {activeTab?.type === "graph" ? (
           <GraphView />
         ) : activeTab?.type === "note" ? (
-          <MarkdownEditor noteId={activeTab.noteId!} />
+          <NoteView
+            noteId={activeTab.noteId!}
+            paneId={pane.id}
+            tabId={activeTab.id}
+            mode={activeTab.mode ?? "preview"}
+          />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
             <FileText

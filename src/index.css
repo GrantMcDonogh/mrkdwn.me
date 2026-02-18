@@ -143,3 +143,153 @@ body {
   background: var(--color-obsidian-accent) !important;
   color: white !important;
 }
+
+/* Markdown Preview */
+.markdown-preview {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-obsidian-text);
+  cursor: default;
+}
+
+.markdown-preview h1 {
+  font-size: 2em;
+  font-weight: 700;
+  margin: 1em 0 0.5em;
+}
+
+.markdown-preview h2 {
+  font-size: 1.6em;
+  font-weight: 600;
+  margin: 0.9em 0 0.4em;
+}
+
+.markdown-preview h3 {
+  font-size: 1.3em;
+  font-weight: 600;
+  margin: 0.8em 0 0.3em;
+}
+
+.markdown-preview h4 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.7em 0 0.3em;
+}
+
+.markdown-preview h5,
+.markdown-preview h6 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+
+.markdown-preview p {
+  margin: 0.5em 0;
+}
+
+.markdown-preview a {
+  color: var(--color-obsidian-link);
+  text-decoration: none;
+}
+
+.markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+.markdown-preview-wikilink {
+  color: var(--color-obsidian-link) !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+}
+
+.markdown-preview-wikilink:hover {
+  text-decoration: underline !important;
+}
+
+.markdown-preview-tag {
+  color: var(--color-obsidian-accent);
+  background: rgba(127, 109, 242, 0.1);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.markdown-preview code {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: "Fira Code", "Consolas", monospace;
+  font-size: 0.9em;
+}
+
+.markdown-preview pre {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+
+.markdown-preview pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.9em;
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid var(--color-obsidian-accent);
+  padding-left: 12px;
+  color: var(--color-obsidian-text-muted);
+  margin: 0.5em 0;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.markdown-preview li {
+  margin: 0.2em 0;
+}
+
+.markdown-preview li input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--color-obsidian-accent);
+}
+
+.markdown-preview table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.8em 0;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--color-obsidian-border);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: var(--color-obsidian-bg-secondary);
+  font-weight: 600;
+}
+
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--color-obsidian-border);
+  margin: 1.5em 0;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.markdown-preview strong {
+  font-weight: 600;
+}
+
+.markdown-preview del {
+  color: var(--color-obsidian-text-muted);
+}

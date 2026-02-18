@@ -1,13 +1,14 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
-import { X, GitFork } from "lucide-react";
+import { X, GitFork, Eye, Pencil } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 interface Tab {
   id: string;
   type: "note" | "graph";
   noteId?: Id<"notes">;
+  mode?: "preview" | "edit";
 }
 
 interface Props {
@@ -21,14 +22,17 @@ function NoteTabItem({
   noteId,
   paneId,
   isActive,
+  mode,
 }: {
   tabId: string;
   noteId: Id<"notes">;
   paneId: string;
   isActive: boolean;
+  mode: "preview" | "edit";
 }) {
   const [, dispatch] = useWorkspace();
   const note = useQuery(api.notes.get, { id: noteId });
+  const ModeIcon = mode === "edit" ? Pencil : Eye;
 
   return (
     <div
@@ -40,6 +44,16 @@ function NoteTabItem({
       onClick={() => dispatch({ type: "SET_ACTIVE_TAB", paneId, tabId })}
     >
       <span className="truncate">{note?.title ?? "..."}</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          dispatch({ type: "TOGGLE_TAB_MODE", paneId, tabId });
+        }}
+        className="opacity-0 group-hover:opacity-100 hover:bg-obsidian-bg-tertiary rounded p-0.5 shrink-0"
+        title={mode === "edit" ? "Switch to preview" : "Switch to edit"}
+      >
+        <ModeIcon size={12} />
+      </button>
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -108,6 +122,7 @@ export default function TabBar({ paneId, tabs, activeTabId }: Props) {
             noteId={tab.noteId!}
             paneId={paneId}
             isActive={tab.id === activeTabId}
+            mode={tab.mode ?? "preview"}
           />
         )
       )}

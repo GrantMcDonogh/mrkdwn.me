@@ -13,6 +13,7 @@ interface Tab {
   id: string;
   type: "note" | "graph";
   noteId?: Id<"notes">; // present when type === "note"
+  mode?: "preview" | "edit"; // present when type === "note"
 }
 
 interface Pane {
@@ -43,7 +44,8 @@ export type Action =
   | { type: "CLOSE_PANE"; paneId: string }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "SET_RIGHT_PANEL"; panel: WorkspaceState["rightPanel"] }
-  | { type: "SET_SEARCH_QUERY"; query: string };
+  | { type: "SET_SEARCH_QUERY"; query: string }
+  | { type: "TOGGLE_TAB_MODE"; paneId: string; tabId: string };
 
 // --- Initial state ---
 
@@ -99,6 +101,7 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         id: `tab-${++tabCounter}`,
         type: "note",
         noteId: action.noteId,
+        mode: "preview",
       };
       const updatedPane = {
         ...pane,
@@ -202,6 +205,24 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
 
     case "SET_SEARCH_QUERY":
       return { ...state, searchQuery: action.query };
+
+    case "TOGGLE_TAB_MODE": {
+      const paneIdx = state.panes.findIndex((p) => p.id === action.paneId);
+      if (paneIdx === -1) return state;
+      const pane = state.panes[paneIdx]!;
+      const tabIdx = pane.tabs.findIndex((t) => t.id === action.tabId);
+      if (tabIdx === -1) return state;
+      const tab = pane.tabs[tabIdx]!;
+      if (tab.type !== "note") return state;
+      const newTabs = [...pane.tabs];
+      newTabs[tabIdx] = {
+        ...tab,
+        mode: tab.mode === "edit" ? "preview" : "edit",
+      };
+      const panes = [...state.panes];
+      panes[paneIdx] = { ...pane, tabs: newTabs };
+      return { ...state, panes };
+    }
 
     default:
       return state;

@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function CommandPalette({ onClose }: Props) {
-  const [, dispatch] = useWorkspace();
+  const [state, dispatch] = useWorkspace();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +48,24 @@ export default function CommandPalette({ onClose }: Props) {
     {
       name: "Manage Vaults",
       action: () => dispatch({ type: "LEAVE_VAULT" }),
+    },
+    {
+      name: "Toggle Preview/Edit Mode",
+      action: () => {
+        const activePane = state.panes.find(
+          (p) => p.id === state.activePaneId
+        );
+        const activeTab = activePane?.tabs.find(
+          (t) => t.id === activePane.activeTabId
+        );
+        if (activeTab?.type === "note") {
+          dispatch({
+            type: "TOGGLE_TAB_MODE",
+            paneId: activePane!.id,
+            tabId: activeTab.id,
+          });
+        }
+      },
     },
   ];
 
