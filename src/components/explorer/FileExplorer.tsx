@@ -12,7 +12,7 @@ import {
   FolderPlus,
   Trash2,
 } from "lucide-react";
-import type { Id, Doc } from "../../../convex/_generated/dataModel";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export default function FileExplorer() {
   const [state, dispatch] = useWorkspace();
