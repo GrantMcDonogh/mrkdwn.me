@@ -32,7 +32,14 @@
       "Bash(npm ls:*)",
       "Bash(python -m base64:*)",
       "Bash(npx vitest run:*)",
-      "Bash(npx vite build)"
+      "Bash(npx vite build)",
+      "Bash(dir:*)",
+      "Bash(vercel --version:*)",
+      "Bash(vercel whoami:*)",
+      "Bash(vercel login:*)",
+      "Bash(vercel:*)",
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

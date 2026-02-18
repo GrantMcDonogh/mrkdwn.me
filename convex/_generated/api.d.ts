@@ -14,6 +14,7 @@ import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as importVault from "../importVault.js";
 import type * as notes from "../notes.js";
+import type * as onboarding from "../onboarding.js";
 import type * as vaults from "../vaults.js";
 
 import type {
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   importVault: typeof importVault;
   notes: typeof notes;
+  onboarding: typeof onboarding;
   vaults: typeof vaults;
 }>;
 
