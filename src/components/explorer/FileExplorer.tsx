@@ -348,7 +348,7 @@ export default function FileExplorer() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="px-3 py-2 border-b border-obsidian-border flex items-center justify-between">
         <span className="text-xs font-semibold uppercase text-obsidian-text-muted">
           Explorer
