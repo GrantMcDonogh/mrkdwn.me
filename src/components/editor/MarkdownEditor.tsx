@@ -66,10 +66,11 @@ export default function MarkdownEditor({ noteId }: Props) {
     setNoteListProvider(() => allNotes ?? []);
   }, [allNotes, dispatch]);
 
-  // Create editor
+  // Create editor — depends on noteId and whether note data has loaded
+  const noteReady = note !== undefined && note !== null;
   useEffect(() => {
-    if (!containerRef.current || note === undefined) return;
-    if (note === null) return;
+    if (!containerRef.current || !noteReady || !note) return;
+    if (viewRef.current) return; // already created for this note
 
     const initialContent = note.content;
     lastSavedContentRef.current = initialContent;
@@ -108,7 +109,7 @@ export default function MarkdownEditor({ noteId }: Props) {
       viewRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [noteId]);
+  }, [noteId, noteReady]);
 
   // Sync external changes
   useEffect(() => {
