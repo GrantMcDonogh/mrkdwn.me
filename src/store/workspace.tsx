@@ -30,7 +30,7 @@ export interface WorkspaceState {
   searchQuery: string;
 }
 
-type Action =
+export type Action =
   | { type: "SET_VAULT"; vaultId: Id<"vaults"> }
   | { type: "LEAVE_VAULT" }
   | { type: "OPEN_NOTE"; noteId: Id<"notes"> }
@@ -47,7 +47,7 @@ type Action =
 
 const defaultPane: Pane = { id: "pane-1", tabs: [], activeTabId: null };
 
-const initialState: WorkspaceState = {
+export const initialState: WorkspaceState = {
   vaultId: null,
   panes: [defaultPane],
   activePaneId: "pane-1",
@@ -61,7 +61,7 @@ const initialState: WorkspaceState = {
 
 let tabCounter = 0;
 
-function reducer(state: WorkspaceState, action: Action): WorkspaceState {
+export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
   switch (action.type) {
     case "SET_VAULT":
       return {

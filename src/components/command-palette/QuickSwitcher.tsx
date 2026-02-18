@@ -8,7 +8,7 @@ interface Props {
   onClose: () => void;
 }
 
-function fuzzyScore(query: string, title: string): number {
+export function fuzzyScore(query: string, title: string): number {
   const q = query.toLowerCase();
   const t = title.toLowerCase();
 
