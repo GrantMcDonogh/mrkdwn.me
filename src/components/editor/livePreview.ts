@@ -66,8 +66,8 @@ class CheckboxWidget extends WidgetType {
 }
 
 function buildDecorations(view: EditorView): DecorationSet {
-  const builder = new RangeSetBuilder<Decoration>();
   const doc = view.state.doc;
+  const ranges: { from: number; to: number; deco: Decoration }[] = [];
 
   for (const { from, to } of view.visibleRanges) {
     syntaxTree(view.state).iterate({
@@ -78,22 +78,22 @@ function buildDecorations(view: EditorView): DecorationSet {
         if (node.name.startsWith("ATXHeading")) {
           const level = parseInt(node.name.replace("ATXHeading", ""), 10) || 1;
           const line = doc.lineAt(node.from);
-          builder.add(line.from, line.from, headingDeco(level));
+          ranges.push({ from: line.from, to: line.from, deco: headingDeco(level) });
         }
 
         // Bold (StrongEmphasis)
         if (node.name === "StrongEmphasis") {
-          builder.add(node.from, node.to, boldMark);
+          ranges.push({ from: node.from, to: node.to, deco: boldMark });
         }
 
         // Italic (Emphasis)
         if (node.name === "Emphasis") {
-          builder.add(node.from, node.to, italicMark);
+          ranges.push({ from: node.from, to: node.to, deco: italicMark });
         }
 
         // Inline code
         if (node.name === "InlineCode") {
-          builder.add(node.from, node.to, inlineCodeMark);
+          ranges.push({ from: node.from, to: node.to, deco: inlineCodeMark });
         }
 
         // Blockquote
@@ -101,7 +101,7 @@ function buildDecorations(view: EditorView): DecorationSet {
           let pos = node.from;
           while (pos < node.to) {
             const line = doc.lineAt(pos);
-            builder.add(line.from, line.from, blockquoteLine);
+            ranges.push({ from: line.from, to: line.from, deco: blockquoteLine });
             pos = line.to + 1;
           }
         }
@@ -109,22 +109,22 @@ function buildDecorations(view: EditorView): DecorationSet {
         // Horizontal rule
         if (node.name === "HorizontalRule") {
           const line = doc.lineAt(node.from);
-          builder.add(
-            line.from,
-            line.to,
-            Decoration.replace({ widget: new HrWidget() })
-          );
+          ranges.push({
+            from: line.from,
+            to: line.to,
+            deco: Decoration.replace({ widget: new HrWidget() }),
+          });
         }
 
         // Task lists
         if (node.name === "TaskMarker") {
           const text = doc.sliceString(node.from, node.to);
           const checked = text.includes("x");
-          builder.add(
-            node.from,
-            node.to,
-            Decoration.replace({ widget: new CheckboxWidget(checked) })
-          );
+          ranges.push({
+            from: node.from,
+            to: node.to,
+            deco: Decoration.replace({ widget: new CheckboxWidget(checked) }),
+          });
         }
       },
     });
@@ -140,12 +140,19 @@ function buildDecorations(view: EditorView): DecorationSet {
       while ((match = tagRegex.exec(line.text)) !== null) {
         const tagStart = line.from + match.index + (match[0].length - match[1]!.length);
         const tagEnd = tagStart + match[1]!.length;
-        builder.add(tagStart, tagEnd, tagMark);
+        ranges.push({ from: tagStart, to: tagEnd, deco: tagMark });
       }
       pos = line.to + 1;
     }
   }
 
+  // Sort by position to satisfy RangeSetBuilder ordering requirement
+  ranges.sort((a, b) => a.from - b.from || a.to - b.to);
+
+  const builder = new RangeSetBuilder<Decoration>();
+  for (const r of ranges) {
+    builder.add(r.from, r.to, r.deco);
+  }
   return builder.finish();
 }
 
