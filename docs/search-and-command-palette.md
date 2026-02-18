@@ -22,10 +22,10 @@ The Search Panel enables users to search across all notes in the active vault by
 
 - **Backend**: Uses Convex's built-in search indexes defined in `convex/schema.ts`:
   ```typescript
-  .searchIndex("search_content", { searchField: "content" })
-  .searchIndex("search_title", { searchField: "title" })
+  .searchIndex("search_content", { searchField: "content", filterFields: ["vaultId"] })
+  .searchIndex("search_title", { searchField: "title", filterFields: ["vaultId"] })
   ```
-- **API**: `notes.search(vaultId, query)` performs server-side full-text search.
+- **API**: `notes.search({ vaultId, query })` performs server-side full-text search (dual-index: searches both `search_title` and `search_content`, merges and deduplicates results, title matches prioritized).
 - **Behavior**:
   1. User types a query in the search input.
   2. The search query is stored in the workspace state (`searchQuery`).
@@ -39,7 +39,7 @@ Each result displays:
 | Element | Description |
 |---------|-------------|
 | Note title | Clickable — opens the note in the editor |
-| Context snippet | A preview of the matching content area |
+| Content preview | The first 150 characters of the note's content (`note.content.slice(0, 150)`) |
 
 - Clicking a result dispatches `OPEN_NOTE` to open the note.
 - Results are limited to 20 items.
@@ -51,7 +51,7 @@ Tags are extracted from note content using the `#tag-name` pattern:
 #### Tag Extraction
 
 1. All notes in the vault are fetched.
-2. A regex scans each note's content for `#word` patterns.
+2. A regex (`/(?:^|\s)#([a-zA-Z][a-zA-Z0-9_-]*)/g`) scans each note's content for tag patterns. The `#` must be preceded by whitespace or start of string, followed by a letter, then letters/digits/underscores/hyphens.
 3. Tags are aggregated with their occurrence count.
 4. Displayed as clickable pills in the search panel.
 
@@ -72,10 +72,10 @@ Search Panel
 │   ├── #tag2 (7)
 │   └── #tag3 (1)
 ├── Search Results
-│   ├── Result 1: [Note Title] — context preview
-│   ├── Result 2: [Note Title] — context preview
+│   ├── Result 1: [Note Title] — first 150 chars of content
+│   ├── Result 2: [Note Title] — first 150 chars of content
 │   └── ...
-└── (Empty state: "No results found" or "Type to search")
+└── (Empty states: "Searching..." while loading, "No results found" when search returns empty, or "Type to search" when no query and no tags)
 ```
 
 ### Panel Placement
@@ -99,7 +99,7 @@ Search Panel
 
 ```
 Command Palette Modal
-├── Search Input (auto-focused)
+├── Search Input (auto-focused, placeholder: "Type a command...")
 ├── Command List (filtered)
 │   ├── ▸ Toggle Sidebar
 │   ├── ▸ Split Editor Vertically
@@ -107,6 +107,7 @@ Command Palette Modal
 │   ├── ▸ Toggle Backlinks Panel
 │   ├── ▸ Toggle Graph View
 │   ├── ▸ Toggle Search
+│   ├── ▸ Toggle Chat
 │   └── ▸ Switch Vault
 └── (Close on Escape or click outside)
 ```
@@ -118,9 +119,10 @@ Command Palette Modal
 | Toggle Sidebar | Show/hide left sidebar | `TOGGLE_SIDEBAR` |
 | Split Editor Vertically | Split into vertical panes | `SPLIT_PANE` (vertical) |
 | Split Editor Horizontally | Split into horizontal panes | `SPLIT_PANE` (horizontal) |
-| Toggle Backlinks Panel | Show/hide backlinks in right panel | `SET_RIGHT_PANEL("backlinks")` |
-| Toggle Graph View | Show/hide graph in right panel | `SET_RIGHT_PANEL("graph")` |
-| Toggle Search | Show/hide search in right panel | `SET_RIGHT_PANEL("search")` |
+| Toggle Backlinks Panel | Show/hide backlinks in right panel | `{ type: "SET_RIGHT_PANEL", panel: "backlinks" }` |
+| Toggle Graph View | Show/hide graph in right panel | `{ type: "SET_RIGHT_PANEL", panel: "graph" }` |
+| Toggle Search | Show/hide search in right panel | `{ type: "SET_RIGHT_PANEL", panel: "search" }` |
+| Toggle Chat | Show/hide chat in right panel | `{ type: "SET_RIGHT_PANEL", panel: "chat" }` |
 | Switch Vault | Return to vault selector | `LEAVE_VAULT` |
 
 ### Interaction
@@ -165,7 +167,7 @@ The quick switcher implements a custom fuzzy matching algorithm:
 3. **Scoring factors**:
    - **Consecutive matches**: Bonus for sequential character matches.
    - **Substring match**: Bonus if the query is a direct substring of the title.
-   - **Position penalty**: Earlier matches in the title score higher.
+   - **Position bonus** (substring matches only): Earlier position of the exact substring in the title scores higher (`1000 - indexOf`). Does not apply to fuzzy matches.
 4. **Ranking**: Results are sorted by score (descending).
 5. **Limit**: Top 20 results are displayed.
 
@@ -205,6 +207,6 @@ Quick Switcher Modal
 |----------|---------|
 | `Ctrl/Cmd + P` | Open Command Palette |
 | `Ctrl/Cmd + O` | Open Quick Switcher |
-| `Ctrl/Cmd + F` | Find in editor (CodeMirror search) |
+| `Ctrl/Cmd + F` | Find in editor (CodeMirror built-in search) |
 
-These shortcuts are registered as global `keydown` event listeners in the `AppLayout` component.
+`Ctrl+P` and `Ctrl+O` are registered as global `keydown` event listeners in the `AppLayout` component. `Ctrl+F` is a built-in CodeMirror keybinding, not registered by the application.

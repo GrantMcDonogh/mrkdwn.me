@@ -66,14 +66,14 @@ mcp-server/
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `list_notes` | List all notes in a vault | `vaultId` |
+| `list_notes` | List all notes in a vault (returns summary: `_id`, `title`, `folderId`, `updatedAt` — no content) | `vaultId` |
 | `get_note` | Get a note's full content | `noteId` |
-| `create_note` | Create a new note | `title`, `vaultId`, `folderId?`, `content?` |
+| `create_note` | Create a new note | `title`, `vaultId`, `folderId?` |
 | `update_note` | Update a note's content | `noteId`, `content` |
 | `rename_note` | Rename a note (updates wiki links) | `noteId`, `title` |
 | `move_note` | Move a note to a folder | `noteId`, `folderId?` |
 | `delete_note` | Delete a note | `noteId` |
-| `search_notes` | Full-text search across vault notes | `vaultId`, `query` |
+| `search_notes` | Full-text search across vault notes (returns `_id`, `title`, and first 200 chars of content as preview) | `vaultId`, `query` |
 | `get_backlinks` | Get notes that link to a given note | `noteId` |
 | `get_unlinked_mentions` | Get notes that mention a note's title without linking | `noteId` |
 
@@ -81,10 +81,10 @@ mcp-server/
 
 The MCP server authenticates as a specific user using a Convex auth token:
 
-1. The user generates or retrieves their Convex auth token.
+1. The user generates or retrieves their Convex auth token (a Clerk JWT).
 2. The token is set as the `CONVEX_AUTH_TOKEN` environment variable.
-3. The `ConvexHttpClient` includes this token in all requests.
-4. All Convex functions validate the token and resolve the user ID as normal.
+3. On startup, `convex-client.ts` creates a `ConvexHttpClient` and calls `client.setAuth(authToken)` if the token is present.
+4. All subsequent Convex queries and mutations include this token, allowing `ctx.auth.getUserIdentity()` to resolve the user.
 
 ## Environment Variables
 
@@ -139,5 +139,14 @@ Add to Claude Desktop's MCP configuration:
 cd mcp-server
 npm install
 npm run build    # tsc -> dist/
+npm run dev      # tsc --watch (for development)
 npm start        # node dist/index.js (stdio)
 ```
+
+## Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `@modelcontextprotocol/sdk` | `^1.12.1` | MCP protocol server implementation |
+| `convex` | `^1.31.7` | Convex HTTP client for backend access |
+| `typescript` | `^5.9.3` | TypeScript compiler (dev) |

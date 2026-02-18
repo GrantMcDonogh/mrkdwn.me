@@ -17,7 +17,7 @@ interface WorkspaceState {
   activePaneId: string;
   splitDirection: "horizontal" | "vertical" | null;
   sidebarOpen: boolean;
-  rightPanel: "backlinks" | "graph" | "search" | null;
+  rightPanel: "backlinks" | "graph" | "search" | "chat" | null;
   searchQuery: string;
 }
 
@@ -46,7 +46,7 @@ interface Tab {
 | `SPLIT_PANE` | `direction` | Split the editor into two panes |
 | `CLOSE_PANE` | `paneId` | Close a pane (returns to single-pane) |
 | `TOGGLE_SIDEBAR` | — | Toggle left sidebar visibility |
-| `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/graph/search) or `null` to close |
+| `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/graph/search/chat) or `null` to close |
 | `SET_SEARCH_QUERY` | `query` | Update the search query string |
 
 ### Reducer Logic
@@ -82,14 +82,14 @@ Components access state via:
 ```
 ┌───────────────────────────────────────────────────────────┐
 │ Toolbar                                                   │
-│ [≡ Sidebar] [Vault Name]            [Backlinks][Graph][🔍]│
+│ [≡ Sidebar] [Vault Name]      [Backlinks][Graph][🔍][💬]│
 ├────────┬──────────────────────────────┬───────────────────┤
 │        │ Tab Bar (Pane 1)             │                   │
 │  Side  │ [Tab1] [Tab2] [Tab3]        │  Right Panel      │
 │  bar   ├──────────────────────────────┤  (Backlinks /     │
 │        │                              │   Graph /         │
-│  File  │ Editor (Pane 1)              │   Search)         │
-│  Expl- │                              │                   │
+│  File  │ Editor (Pane 1)              │   Search /        │
+│  Expl- │                              │   Chat)           │
 │  orer  │ MarkdownEditor               │                   │
 │        │                              │                   │
 │        ├──────────────────────────────┤                   │
@@ -109,6 +109,7 @@ The toolbar spans the top of the layout and contains:
 | Backlinks button | Right | `SET_RIGHT_PANEL("backlinks")` |
 | Graph button | Right | `SET_RIGHT_PANEL("graph")` |
 | Search button | Right | `SET_RIGHT_PANEL("search")` |
+| Chat button | Right | `SET_RIGHT_PANEL("chat")` |
 
 Each right-panel button toggles its respective panel. The active panel button is visually highlighted.
 
@@ -130,14 +131,14 @@ Registered in `AppLayout`:
 ### Behavior
 
 - Controlled by `sidebarOpen` in workspace state.
-- When open: renders the `FileExplorer` component with a fixed width.
-- When closed: fully hidden (width 0).
+- When open: renders the `FileExplorer` component with a fixed width (`w-60` / 240px).
+- When closed: returns `null` (component is not rendered at all, not hidden with width 0).
 - Toggled via the toolbar button or the command palette.
 
 ### Layout
 
 - Position: Left side of the app.
-- Width: Fixed (approximately 250px).
+- Width: Fixed `w-60` (240px).
 - Background: `obsidian-bg-secondary`.
 - Border: Right border separating from editor area.
 - Content: The `FileExplorer` component (see [file-explorer.md](./file-explorer.md)).
@@ -157,7 +158,7 @@ Each pane has its own tab bar displaying the open notes as tabs.
 | Element | Description |
 |---------|-------------|
 | Tab label | Note title (fetched from note data) |
-| Close button | `×` icon, visible on hover |
+| Close button | Lucide `X` icon (size 12), visible on hover via `opacity-0 group-hover:opacity-100` |
 | Active indicator | Background highlight on the active tab |
 | Inactive style | Muted background |
 
@@ -172,7 +173,7 @@ Each pane has its own tab bar displaying the open notes as tabs.
 ### Tab Lifecycle
 
 1. **Open note** (`OPEN_NOTE`): If the note is already open in the active pane, that tab activates. Otherwise, a new tab is appended and activated.
-2. **Close tab** (`CLOSE_TAB`): Tab is removed. If it was active, the previous sibling tab activates. If no tabs remain, the pane shows an empty state.
+2. **Close tab** (`CLOSE_TAB`): Tab is removed. If it was active, the previous sibling tab activates; if no previous sibling exists, the first remaining tab activates. If no tabs remain, `activeTabId` is set to `null` and the pane shows an empty state.
 3. **Multiple panes**: Each pane maintains its own independent list of tabs. The same note can be open in tabs across different panes.
 
 ---
@@ -212,7 +213,7 @@ The split pane system allows users to view two notes side-by-side by splitting t
 - Only one pane is "active" at a time (tracked by `activePaneId`).
 - Clicking anywhere in a pane sets it as active.
 - The active pane determines where `OPEN_NOTE` creates new tabs.
-- The active pane has a subtle visual distinction (e.g., slightly brighter border).
+- The active pane has a subtle visual distinction: `border border-obsidian-accent/20` (only shown when in split mode, i.e., `panes.length > 1`).
 
 ### Limitations
 
@@ -231,13 +232,14 @@ The right panel is a collapsible area on the right side of the layout that displ
 | `"backlinks"` | `BacklinksPanel` | Backlinks and unlinked mentions for the active note |
 | `"graph"` | `GraphView` | Force-directed graph of note relationships |
 | `"search"` | `SearchPanel` | Full-text search and tag filtering |
+| `"chat"` | `ChatPanel` | RAG chat powered by Claude AI |
 | `null` | — | Panel hidden |
 
 ### Behavior
 
 - Only one right panel can be visible at a time.
 - Selecting the same panel again closes it (toggle behavior).
-- The panel has a fixed width (approximately 300px).
+- The panel has a fixed width `w-72` (288px).
 - Panel content updates reactively based on the active note and vault data.
 
 ---

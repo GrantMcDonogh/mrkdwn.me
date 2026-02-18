@@ -29,9 +29,9 @@ The `GraphView` component:
    - `title`: The note's title
    - Visual properties (radius, color)
 
-2. **Links**: For each note, the content is scanned for `[[...]]` patterns:
-   - The target title is extracted from each wiki link.
-   - A lookup matches the title to an existing note in the vault.
+2. **Links**: For each note, the content is scanned with regex `/\[\[([^\]|#]+)/g`:
+   - The target title is extracted, stripping any `|alias` or `#heading` suffixes.
+   - A case-sensitive lookup matches the title to an existing note in the vault.
    - If a match is found, a link is created: `{ source: currentNoteId, target: matchedNoteId }`.
    - Duplicate links between the same pair of notes are deduplicated.
 
@@ -58,33 +58,34 @@ The D3 force simulation applies physics-based forces to position nodes:
 
 | Force | Configuration | Purpose |
 |-------|--------------|---------|
-| `forceLink` | Distance based on link count | Pulls linked nodes closer together |
+| `forceLink` | Fixed distance of 80px | Pulls linked nodes closer together |
 | `forceManyBody` | Negative charge (repulsion) | Prevents nodes from overlapping |
 | `forceCenter` | Center of SVG viewport | Keeps the graph centered |
 | `forceCollide` | Radius-based collision | Prevents node overlap |
 
 ### Simulation Parameters
 
-- **Link distance**: Scales with the number of links (more links → shorter distance for strongly connected nodes).
-- **Charge strength**: Negative value creates repulsion between all nodes.
+- **Link distance**: Fixed at 80px for all links.
+- **Charge strength**: -200 (repulsion between all nodes).
 - **Center force**: Gently pulls nodes toward the center of the viewport.
-- **Collision radius**: Based on node radius plus padding.
+- **Collision radius**: Fixed at 20px for all nodes.
 
 ## Rendering
 
 ### SVG Structure
 
 ```
-<svg>
-  <g class="zoom-container">       ← Transform group for zoom/pan
-    <g class="links">              ← Edge lines
-      <line />                     ← One per link
+<svg ref={svgRef}>                   ← React JSX element with ref
+  <g>                                ← Transform group for zoom/pan (no class)
+    <g>                              ← Edge lines (no class)
+      <line />                       ← One per link
       ...
     </g>
-    <g class="nodes">              ← Node circles + labels
-      <g class="node">            ← One per note
-        <circle />                 ← Node visual
-        <text />                   ← Note title label
+    <g>                              ← Node groups (no class)
+      <g>                            ← One per note (no class)
+        <circle />                   ← Node visual
+        <text />                     ← Note title label
+        <title />                    ← Native SVG tooltip
       </g>
       ...
     </g>
@@ -92,25 +93,27 @@ The D3 force simulation applies physics-based forces to position nodes:
 </svg>
 ```
 
+Note: The SVG is a React JSX element with a `ref`. D3 selects it via `d3.select(svg)` but does not create it. No CSS class names are applied to the `<g>` elements.
+
 ### Node Appearance
 
 | Property | Value | Notes |
 |----------|-------|-------|
 | Shape | Circle | SVG `<circle>` |
-| Base radius | 6px | Minimum size |
-| Scaled radius | 6 + (linkCount * 2)px | Larger = more connections |
-| Color (default) | `#7f6df2` (accent) | Obsidian accent purple |
+| Radius | `Math.max(4, Math.min(12, 4 + linkCount * 2))` | Min 4px, max 12px, scales with connections |
+| Color (default) | `#dcddde` (light gray) | Non-active nodes |
 | Color (active) | `#8b7cf3` (accent-hover) | Currently open note |
-| Stroke | Lighter accent on hover | Visual feedback |
-| Label | Note title | Positioned below the node |
-| Label color | `#dcddde` (text) | Obsidian text color |
+| Stroke (default) | `transparent` | No visible stroke |
+| Stroke (active) | `#8b7cf3` | Active note has accent stroke, width 2 |
+| Label | Note title | Positioned to the right of the node (dx=12, dy=4) |
+| Label color | `#999` | Muted gray |
 
 ### Edge Appearance
 
 | Property | Value |
 |----------|-------|
 | Shape | Straight line |
-| Color | `#3e3e3e` (border color) with partial opacity |
+| Color | `#3e3e3e` (border color) |
 | Width | 1px |
 
 ## Interactions
@@ -127,38 +130,36 @@ Clicking a node opens the corresponding note in the editor:
 
 Nodes can be dragged to manually reposition them:
 
-1. **Drag start**: Fixes the node's position (`fx`, `fy`), pauses gravity for that node.
-2. **During drag**: Updates node position to follow cursor.
-3. **Drag end**: Releases the fixed position, allowing the simulation to resume.
-
-The simulation is "reheated" (alpha reset) on drag to allow the graph to re-settle.
+1. **Drag start**: Pins the node's position (`fx`, `fy`). The simulation is reheated via `alphaTarget(0.3).restart()` to allow the graph to respond.
+2. **During drag**: Updates `fx`, `fy` to follow cursor. All forces still act on other nodes.
+3. **Drag end**: Releases the pinned position (`fx = null, fy = null`). Sets `alphaTarget(0)` to allow natural cooldown.
 
 ### Zoom & Pan
 
 - **Zoom**: Mouse scroll zooms in/out (D3 zoom behavior).
 - **Pan**: Click and drag on the background pans the view.
-- **Zoom extent**: Constrained between 0.1x and 4x zoom.
+- **Zoom extent**: Constrained between 0.3x and 4x zoom.
 
 ### Tooltips
 
-- Hovering over a node displays the note's full title in a tooltip.
-- Useful when labels are truncated or overlapping.
+- Each node has a native SVG `<title>` element showing the note's full title on hover (browser default tooltip).
+- Labels always display the full title text (no truncation is applied).
 
 ## Active Note Highlighting
 
 The currently active note (open in the editor) is visually distinguished:
 
-- **Larger radius**: Active node gets a size boost.
-- **Different color**: Uses the hover accent color.
-- **Glow effect**: Optional stroke/shadow to make it stand out.
+- **Different fill color**: `#8b7cf3` (accent-hover) instead of the default `#dcddde`.
+- **Visible stroke**: `#8b7cf3` with width 2 (non-active nodes have transparent stroke).
+- **Same radius**: The active note does not get a size boost — radius depends only on link count.
 
-The `activeNoteId` is passed from the workspace state to the graph component.
+The `activeNoteId` is derived internally via `useWorkspace()` — the component accepts no props. It navigates the panes/tabs structure to find the active tab's `noteId`.
 
 ## Lifecycle
 
 ### Mount
 
-1. SVG element is created and attached to the container `div`.
+1. SVG element (React JSX with `ref`) is selected by D3.
 2. D3 zoom behavior is initialized on the SVG.
 3. Force simulation is created with initial node/link data.
 4. Tick function renders node/link positions on each simulation step.
@@ -167,9 +168,9 @@ The `activeNoteId` is passed from the workspace state to the graph component.
 
 1. When notes change (created, deleted, renamed, content edited), `useQuery` returns new data.
 2. The graph data (nodes/links) is recomputed with `useMemo`.
-3. The D3 simulation is updated with new nodes and links.
-4. New nodes enter, removed nodes exit, existing nodes update.
-5. Simulation is reheated to re-settle the layout.
+3. The entire SVG content is wiped (`selectAll("*").remove()`) and rebuilt from scratch.
+4. A new simulation is created with the updated nodes and links.
+5. There is no D3 enter/exit/update pattern — it is a full teardown and rebuild on each data change.
 
 ### Unmount
 
@@ -185,7 +186,7 @@ The graph view is displayed in the **right panel** of the app layout:
 - Activated through:
   - Toolbar button in the app layout header.
   - Command palette: "Toggle Graph View" command.
-- The panel shares space with backlinks and search (only one right panel visible at a time).
+- The panel shares space with backlinks, search, and chat (only one right panel visible at a time).
 
 ## Performance
 

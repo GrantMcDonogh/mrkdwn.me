@@ -14,7 +14,7 @@ mrkdwn.me is a cloud-based knowledge management system inspired by [Obsidian](ht
 | Styling | Tailwind CSS | 4.1.18 |
 | Routing | React Router DOM | 7.13.0 |
 | Backend / Database | Convex | 1.31.7 |
-| Authentication | @convex-dev/auth + @auth/core | 0.0.90 / 0.37.4 |
+| Authentication | @clerk/clerk-react | ^5.25.3 |
 | Editor | CodeMirror 6 | 6.x (multiple packages) |
 | Graph Visualization | D3.js | 7.9.0 |
 | Icons | lucide-react | 0.574.0 |
@@ -51,24 +51,25 @@ The application follows a **client-server architecture** with Convex as the serv
 │  │ vaults   │ │ folders  │ │ notes    │            │
 │  │ .ts      │ │ .ts      │ │ .ts      │            │
 │  └──────────┘ └──────────┘ └──────────┘            │
-│  ┌──────────┐ ┌──────────┐                          │
-│  │ auth.ts  │ │ schema   │                          │
-│  │          │ │ .ts      │                          │
-│  └──────────┘ └──────────┘                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │ chat.ts  │ │ http.ts  │ │ schema   │            │
+│  │          │ │          │ │ .ts      │            │
+│  └──────────┘ └──────────┘ └──────────┘            │
 │                                                     │
 │  Database: Convex (document-based, indexed)          │
-│  Auth: Password + Google OAuth                       │
+│  Auth: Clerk (JWT validation)                        │
 └─────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure
 
 ```
-obsidian-online/
+mrkdwn-me/
 ├── src/                          # Frontend source code
 │   ├── components/
-│   │   ├── auth/                 # Authentication UI
+│   │   ├── auth/                 # Authentication UI (Clerk SignIn)
 │   │   ├── backlinks/            # Backlinks panel
+│   │   ├── chat/                 # AI chat panel (Claude RAG)
 │   │   ├── command-palette/      # Command palette & quick switcher
 │   │   ├── editor/               # Markdown editor, wiki links, live preview
 │   │   ├── explorer/             # File tree explorer
@@ -78,24 +79,32 @@ obsidian-online/
 │   │   └── vault/                # Vault selection & management
 │   ├── store/
 │   │   └── workspace.tsx         # Global state (Context + Reducer)
-│   ├── App.tsx                   # Root component with routing
+│   ├── App.tsx                   # Root component with auth gating
 │   ├── main.tsx                  # Entry point with providers
 │   └── index.css                 # Global styles & Tailwind theme
 │
 ├── convex/                       # Backend serverless functions
 │   ├── schema.ts                 # Database schema
-│   ├── auth.ts                   # Auth provider config
-│   ├── auth.config.ts            # Auth environment config
+│   ├── auth.config.ts            # Clerk JWT validation config
 │   ├── vaults.ts                 # Vault CRUD operations
 │   ├── folders.ts                # Folder management
-│   ├── notes.ts                  # Note CRUD, search, backlinks, graph
-│   ├── http.ts                   # HTTP route setup
+│   ├── notes.ts                  # Note CRUD, search, backlinks
+│   ├── chat.ts                   # AI chat HTTP action (Claude API)
+│   ├── chatHelpers.ts            # RAG context builder (internal query)
+│   ├── http.ts                   # HTTP routes (/api/chat)
 │   └── _generated/               # Auto-generated API types
 │
+├── mcp-server/                   # MCP server for AI tool access
+│   ├── src/                      # Server source (tools for vaults/folders/notes)
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── docs/                         # Project documentation
 ├── public/                       # Static assets
 ├── index.html                    # HTML entry point
 ├── package.json                  # Dependencies & scripts
 ├── vite.config.ts                # Vite build config
+├── vercel.json                   # Vercel deployment config
 ├── tsconfig.json                 # TypeScript config (root)
 ├── tsconfig.app.json             # TypeScript config (app)
 └── eslint.config.js              # Linting rules
@@ -103,16 +112,15 @@ obsidian-online/
 
 ## Data Model Overview
 
-The application has four core entities:
+The application has three database tables (users are managed by Clerk):
 
-- **Users** - Managed by Convex Auth; stores account and session data.
-- **Vaults** - Top-level containers owned by a user. All notes and folders belong to a vault.
-- **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`.
-- **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content.
+- **Vaults** - Top-level containers owned by a user (identified by Clerk `tokenIdentifier`). All notes and folders belong to a vault.
+- **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`. Have an `order` field for sorting.
+- **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content. Have `order`, `createdAt`, and `updatedAt` fields.
 
 ```
-User 1──* Vault 1──* Folder (self-referencing parentId)
-                  1──* Note
+User (Clerk) 1──* Vault 1──* Folder (self-referencing parentId)
+                           1──* Note
 ```
 
 ## Key Design Decisions
@@ -148,11 +156,13 @@ npm run lint
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `CONVEX_DEPLOYMENT` | Convex deployment identifier |
-| `VITE_CONVEX_URL` | Convex backend API URL |
-| `VITE_CONVEX_SITE_URL` | Convex site URL for HTTP routes |
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `CONVEX_DEPLOYMENT` | .env.local | Convex deployment identifier |
+| `VITE_CONVEX_URL` | .env.local | Convex backend API URL |
+| `VITE_CLERK_PUBLISHABLE_KEY` | .env.local | Clerk publishable key for frontend auth |
+| `CLERK_JWT_ISSUER_DOMAIN` | Convex env vars | Clerk JWT issuer domain for backend validation |
+| `ANTHROPIC_API_KEY` | Convex env vars | API key for Claude AI chat feature |
 
 ## Feature Index
 
@@ -168,3 +178,6 @@ npm run lint
 | Workspace & Layout | [workspace-and-layout.md](./workspace-and-layout.md) |
 | Database & API | [database-and-api.md](./database-and-api.md) |
 | Real-Time & Sync | [real-time-and-sync.md](./real-time-and-sync.md) |
+| AI Chat (RAG) | [rag-chat.md](./rag-chat.md) |
+| Design & Styling | [design-and-styling.md](./design-and-styling.md) |
+| MCP Server | [mcp-server.md](./mcp-server.md) |

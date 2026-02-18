@@ -12,23 +12,11 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 
 ```
 ┌──────────────┐
-│    users     │  (managed by @convex-dev/auth)
-│──────────────│
-│ _id          │
-│ name?        │
-│ email?       │
-│ image?       │
-│ ...          │
-└──────┬───────┘
-       │ 1
-       │
-       │ *
-┌──────▼───────┐
 │    vaults    │
 │──────────────│
 │ _id          │
 │ name         │
-│ userId ──────┼──→ users._id
+│ userId ──────┼──→ Clerk tokenIdentifier (string)
 │ createdAt    │
 │ idx: by_user │
 └──────┬───────┘
@@ -56,9 +44,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 
 ### Tables
 
-#### `users`
-
-Managed automatically by `@convex-dev/auth`. Includes auth-related tables (`authSessions`, `authAccounts`, etc.) via `authTables`.
+> **Note:** There is no `users` table in the Convex schema. User identity is managed by Clerk; the `userId` field on vaults stores the Clerk `tokenIdentifier` string.
 
 #### `vaults`
 
@@ -66,7 +52,7 @@ Managed automatically by `@convex-dev/auth`. Includes auth-related tables (`auth
 |-------|------|-------------|
 | `_id` | `Id<"vaults">` | Primary key (auto-generated) |
 | `name` | `v.string()` | Vault display name |
-| `userId` | `v.id("users")` | Foreign key to owning user |
+| `userId` | `v.string()` | Clerk `tokenIdentifier` identifying the owning user |
 | `createdAt` | `v.number()` | Creation timestamp (ms since epoch) |
 
 **Indexes:**
@@ -104,8 +90,8 @@ Managed automatically by `@convex-dev/auth`. Includes auth-related tables (`auth
 - `by_folder` → `["vaultId", "folderId"]` — Notes within a specific folder
 
 **Search Indexes:**
-- `search_content` → `{ searchField: "content" }` — Full-text search on note content
-- `search_title` → `{ searchField: "title" }` — Full-text search on note title
+- `search_content` → `{ searchField: "content", filterFields: ["vaultId"] }` — Full-text search on note content, scoped by vault
+- `search_title` → `{ searchField: "title", filterFields: ["vaultId"] }` — Full-text search on note title, scoped by vault
 
 ---
 
@@ -148,28 +134,27 @@ Managed automatically by `@convex-dev/auth`. Includes auth-related tables (`auth
 | `notes.rename` | Mutation | `{ id, title }` | — | Rename note + update wiki link references |
 | `notes.move` | Mutation | `{ id, folderId? }` | — | Move note to folder |
 | `notes.remove` | Mutation | `{ id }` | — | Delete note |
-| `notes.search` | Query | `{ vaultId, query }` | `Note[]` | Full-text search (max 20 results) |
-| `notes.getBacklinks` | Query | `{ noteId }` | `Backlink[]` | Get notes linking to this note |
-| `notes.getUnlinkedMentions` | Query | `{ noteId }` | `Mention[]` | Get unlinked title mentions |
+| `notes.search` | Query | `{ vaultId, query }` | `Note[]` | Full-text search via dual-index (title + content), merged, deduped, max 20 results |
+| `notes.getBacklinks` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get notes linking to this note |
+| `notes.getUnlinkedMentions` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get unlinked title mentions |
 
-### Authentication
+### Chat Operations
 
-**File:** `convex/auth.ts`
+**File:** `convex/chat.ts` (httpAction), `convex/chatHelpers.ts` (internalQuery)
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `auth` | Object | Session verification for queries/mutations |
-| `signIn` | Action | Sign in/up action |
-| `signOut` | Action | Sign out action |
-| `store` | Object | Auth data store |
+| Function | Type | Description |
+|----------|------|-------------|
+| `chat` | httpAction | Streaming AI chat endpoint. Authenticates via `ctx.auth.getUserIdentity()`, builds context from vault notes via `chatHelpers.buildContext`, calls Claude API (`claude-sonnet-4-5-20250929`) with streaming, returns `text/plain; charset=utf-8`. |
+| `chatHelpers.buildContext` | internalQuery | Accepts `{ vaultId, query }`. Searches notes via `search_title` and `search_content` indexes (15 each), merges/deduplicates. Builds two-tier context: top 5 with full content, next 10 title-only, 80K char limit. Falls back to fetching 15 notes by vault index if no search results. |
 
 ### HTTP Routes
 
 **File:** `convex/http.ts`
 
-| Route | Purpose |
-|-------|---------|
-| Auth callback routes | OAuth redirect handling (auto-registered by `auth.addHttpRoutes`) |
+| Route | Method | Handler | Purpose |
+|-------|--------|---------|---------|
+| `/api/chat` | POST | `chat` | AI chat streaming endpoint |
+| `/api/chat` | OPTIONS | `chat` | CORS preflight handling |
 
 ---
 
@@ -181,8 +166,9 @@ Every query and mutation follows the same authorization pattern:
 export const someFunction = query({
   args: { /* ... */ },
   handler: async (ctx, args) => {
-    const userId = await auth.getUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const userId = identity.tokenIdentifier;
 
     // For vault operations: verify vault ownership
     const vault = await ctx.db.get(args.vaultId);
@@ -195,8 +181,8 @@ export const someFunction = query({
 });
 ```
 
-- **Authentication**: Every function checks for a valid user session.
-- **Authorization**: Vault operations verify that the requesting user owns the vault.
+- **Authentication**: Every function calls `ctx.auth.getUserIdentity()` to verify the Clerk JWT.
+- **Authorization**: Vault operations verify that the requesting user's `tokenIdentifier` matches the vault's `userId`.
 - **Data isolation**: Queries are scoped by `userId` (vaults) or `vaultId` (folders/notes).
 
 ---

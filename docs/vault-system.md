@@ -11,7 +11,7 @@ Vaults are the top-level organizational unit in mrkdwn.me, mirroring the concept
 ```typescript
 vaults: defineTable({
   name: v.string(),
-  userId: v.id("users"),
+  userId: v.string(),
   createdAt: v.number(),
 }).index("by_user", ["userId"]),
 ```
@@ -20,7 +20,7 @@ vaults: defineTable({
 |-------|------|-------------|
 | `_id` | `Id<"vaults">` | Auto-generated primary key |
 | `name` | `string` | Display name of the vault |
-| `userId` | `Id<"users">` | Owner of the vault |
+| `userId` | `string` | Clerk `tokenIdentifier` identifying the owner |
 | `createdAt` | `number` | Unix timestamp of creation |
 
 ### Index
@@ -93,27 +93,28 @@ The vault selector is the first screen shown after authentication. It displays a
 
 | Element | Description |
 |---------|-------------|
-| Header | "Your Vaults" title with a "Sign Out" button |
-| Vault List | Grid of vault cards, each showing the vault name |
-| Create Button | "Create New Vault" button below the list |
-| Create Form | Inline input field that appears when creating a new vault |
+| Header | "Your Vaults" title with a "Sign Out" button (`LogOut` icon, calls `useClerk().signOut()`) |
+| Vault List | Vertical stack of vault cards, each showing the vault name with hover-reveal action buttons (Pencil for rename, Trash2 for delete) |
+| Create Button | Full-width dashed-border card with `Plus` icon and "Create New Vault" text |
+| Create Form | Inline form with text input, "Create" submit button, and "Cancel" button |
+| Empty State | "No vaults yet. Create one to get started." message (shown when no vaults exist) |
 
 #### Interactions
 
 1. **Select Vault**: Clicking a vault card dispatches `SET_VAULT` action, which transitions the UI to the main `AppLayout`.
 2. **Create Vault**: Clicking "Create New Vault" reveals an input field. Submitting calls `vaults.create` mutation.
-3. **Rename Vault**: Clicking the rename icon on a vault card enables inline editing. On blur or Enter, calls `vaults.rename`.
-4. **Delete Vault**: Clicking the trash icon triggers a confirmation. On confirm, calls `vaults.remove`.
+3. **Rename Vault**: Double-clicking the Pencil icon on a vault card enables inline editing. On blur or Enter, calls `vaults.rename`. Pressing Escape cancels the rename without saving.
+4. **Delete Vault**: Clicking the Trash2 icon triggers a native `window.confirm()` dialog. On confirm, calls `vaults.remove`.
 
 #### State Management
 
 - The selected vault ID is stored in the workspace context (`vaultId` field).
-- Dispatching `SET_VAULT` sets the vault and transitions to the app layout.
-- Dispatching `LEAVE_VAULT` clears the vault and returns to the selector.
+- Dispatching `SET_VAULT` sets the vault and resets the entire workspace state (`...initialState`), including sidebar, right panel, search query, and split direction.
+- Dispatching `LEAVE_VAULT` clears the vault and resets the entire workspace state, returning to the selector.
 
 ### Vault Navigation
 
-- From within the app layout, users can return to the vault selector via the command palette ("Switch Vault" command) or a dedicated UI action.
+- From within the app layout, users can return to the vault selector via the command palette ("Switch Vault" command).
 - Switching vaults clears all open tabs and panes, resetting the workspace state.
 
 ## Ownership & Access Control

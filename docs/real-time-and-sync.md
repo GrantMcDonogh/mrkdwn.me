@@ -36,6 +36,7 @@ mrkdwn.me leverages Convex's built-in real-time subscription system to keep all 
 | `SearchPanel` | `notes.search`, `notes.list` | Note content/title changes |
 | `TabBar` | `notes.get` (per tab) | Note title renames |
 | `VaultSelector` | `vaults.list` | Vault create, rename, delete |
+| `ChatPanel` | HTTP streaming (not `useQuery`) | Streams responses from `/api/chat` endpoint |
 
 ---
 
@@ -86,7 +87,7 @@ Since mrkdwn.me is single-user (no collaborative editing):
 - **Last write wins**: If the same note is open in two panes and edited simultaneously, the last save overwrites the previous one.
 - **External updates**: When a note is modified externally (e.g., wiki link rename), the editor checks whether the user is actively editing:
   - If the editor is **not focused**: the content is replaced with the server version.
-  - If the editor **is focused**: the update is deferred to avoid disrupting the user.
+  - If the editor **is focused**: the update is skipped entirely (the condition `!view.hasFocus` must be true). There is no deferred application — the next save from the focused editor will overwrite the server state.
 
 ---
 

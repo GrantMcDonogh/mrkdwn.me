@@ -16,11 +16,11 @@ Client (ChatPanel)
   v
 Convex httpAction (convex/chat.ts)
   |
-  | 1. Validate auth token
-  | 2. Verify vault ownership
-  | 3. Fetch vault notes for context
-  | 4. Build context (two-tier approach)
-  | 5. Call Anthropic API with stream: true
+  | 1. Authenticate via ctx.auth.getUserIdentity()
+  | 2. Validate request body (vaultId, message)
+  | 3. Build context via chatHelpers.buildContext (internal query)
+  | 4. Call Anthropic API (claude-sonnet-4-5-20250929) with stream: true
+  | 5. Stream response via TransformStream
   |
   v
 TransformStream → streamed response back to client
@@ -28,7 +28,13 @@ TransformStream → streamed response back to client
 
 ### Why httpAction?
 
-Convex queries and mutations don't support streaming responses. The chat endpoint uses an `httpAction` which can return arbitrary HTTP responses, including streaming via `TransformStream`. Authentication is handled manually via the `Authorization` header since httpActions don't have built-in `auth.getUserId()`.
+Convex queries and mutations don't support streaming responses. The chat endpoint uses an `httpAction` which can return arbitrary HTTP responses, including streaming via `TransformStream`. Authentication uses the built-in `ctx.auth.getUserIdentity()` which validates the Clerk JWT passed in the `Authorization` header.
+
+### Context Building
+
+Context is built by `convex/chatHelpers.ts`, an `internalQuery` called `buildContext`. It performs a dual-index search (title + content, 15 results each), merges and deduplicates, then builds a two-tier context string. If no search results match, it falls back to fetching 15 notes by the `by_vault` index.
+
+> **Note:** Vault ownership is not explicitly verified in the chat endpoint — any authenticated user who knows a vault ID could potentially query its notes.
 
 ## Context Building
 
@@ -66,14 +72,23 @@ The context builder uses a two-tier approach to maximize relevance within the to
 }
 ```
 
-**Response:** Streamed plain text (content-type: `text/plain`). Tokens arrive as they are generated.
+**Response:** Streamed plain text (content-type: `text/plain; charset=utf-8`). Tokens arrive as they are generated.
 
-### Authentication
+### Authentication & Error Handling
 
-1. Extract the bearer token from the `Authorization` header.
-2. Use Convex's internal auth verification to resolve the user ID.
-3. Verify the user owns the requested vault.
-4. If any step fails, return 401.
+Authentication uses `ctx.auth.getUserIdentity()` (Clerk JWT validation). Error responses:
+
+| Status | Condition |
+|--------|-----------|
+| 401 | No valid user identity |
+| 400 | Missing `vaultId` or `message` in request body |
+| 403 | `buildContext` returned null |
+| 500 | `ANTHROPIC_API_KEY` env var not set |
+| 502 | Claude API returned a non-OK response |
+
+### CORS
+
+The endpoint includes CORS headers (`Access-Control-Allow-Origin: *`) and handles OPTIONS preflight requests.
 
 ## System Prompt
 

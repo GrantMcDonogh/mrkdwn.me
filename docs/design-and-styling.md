@@ -63,10 +63,9 @@ All colors are defined as Tailwind `@theme` custom properties in `src/index.css`
 | Tag bg | `rgba(127,109,242,0.1)` | `.cm-tag-mark` |
 | Autocomplete selected | `#7f6df2` bg, `white` text | `.cm-tooltip-autocomplete` |
 | Error text | Tailwind `text-red-400` | Form errors, delete buttons |
-| Google button | `bg-white`, `text-gray-800` | OAuth button |
 | Graph link stroke | `#3e3e3e` | D3 `<line>` elements |
 | Graph node (default) | `#dcddde` | D3 `<circle>` fill |
-| Graph node (active) | `#7f6df2` | D3 `<circle>` fill when note is open |
+| Graph node (active) | `#8b7cf3` | D3 `<circle>` fill when note is open |
 | Graph node stroke (active) | `#8b7cf3` | D3 `<circle>` stroke |
 | Graph label | `#999` | D3 `<text>` fill |
 | HR widget | `#3e3e3e` | `border-top` on `<hr>` in live preview |
@@ -110,7 +109,6 @@ Used only for inline code blocks (`.cm-inline-code`).
 
 | Class | Size | Where |
 |-------|------|-------|
-| `text-3xl` | 1.875rem | Auth page title |
 | `text-2xl` | 1.5rem | Vault selector title |
 | `text-lg` | 1.125rem | "No note open" message |
 | `text-sm` | 0.875rem | Most UI text — tabs, explorer items, form labels, modal items |
@@ -173,7 +171,7 @@ The app is a classic IDE-style layout built entirely with Tailwind flexbox utili
 ### Split Pane (`SplitPane.tsx`)
 
 - Container: `flex h-full flex-row` (vertical) or `flex-col` (horizontal)
-- Divider: `w-1 cursor-col-resize bg-obsidian-border hover:bg-obsidian-accent shrink-0`
+- Divider: `w-1 cursor-col-resize bg-obsidian-border hover:bg-obsidian-accent transition-colors shrink-0`
 - Pane size range: 20% to 80% (enforced in drag handler)
 
 ---
@@ -201,11 +199,6 @@ text-obsidian-accent  (replaces text-muted)
 **Destructive:**
 ```
 text-obsidian-text-muted hover:text-red-400 p-1
-```
-
-**Google OAuth:**
-```
-bg-white text-gray-800 py-2 rounded font-medium hover:bg-gray-100 transition-colors
 ```
 
 ### Form Inputs
@@ -247,18 +240,6 @@ Inactive: `bg-obsidian-bg-secondary text-obsidian-text-muted hover:text-obsidian
 Close button (hover reveal):
 ```
 opacity-0 group-hover:opacity-100 hover:bg-obsidian-bg-tertiary rounded p-0.5
-```
-
-### Auth Page Tab Switcher
-
-Active tab:
-```
-border-obsidian-accent text-obsidian-text
-```
-
-Inactive tab:
-```
-border-transparent text-obsidian-text-muted hover:text-obsidian-text
 ```
 
 ### Section Headers
@@ -311,15 +292,11 @@ Nesting indentation: `style={{ paddingLeft: ${depth * 16}px }}`
 
 ### Tag Chips (Search Panel)
 
-Active:
 ```
-bg-obsidian-accent text-white
+px-2 py-0.5 text-xs rounded bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text transition-colors
 ```
 
-Inactive:
-```
-bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text
-```
+Clicking a tag sets it as the search query (no separate active/selected state).
 
 ### Backlink / Search Result Items
 
@@ -450,7 +427,7 @@ The app uses CSS transitions sparingly:
 | Pattern | Class | Where |
 |---------|-------|-------|
 | Color transitions | `transition-colors` | Buttons, tabs, links, vault cards |
-| Opacity transitions | `transition-opacity` | Hover-reveal action buttons |
+| Opacity transitions | `transition-opacity` | Vault card action buttons only |
 | Hover reveal | `opacity-0 group-hover:opacity-100` | Tab close, explorer actions, vault actions |
 
 No keyframe animations are used. The D3 graph uses force simulation physics (not CSS animation) for node movement.
@@ -463,7 +440,7 @@ The app currently uses **fixed widths** rather than responsive breakpoints:
 
 - Sidebar: `w-60` (240px)
 - Right panel: `w-72` (288px)
-- Modals: `max-w-md` (448px) / `max-w-lg` (512px)
+- Modals: `max-w-md` (448px)
 - Auth form: `max-w-md`
 
 The editor area fills remaining space via `flex-1 min-w-0`. Split pane resizing is constrained to 20%-80%.

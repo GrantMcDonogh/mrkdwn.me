@@ -20,7 +20,7 @@ Wiki links are the primary mechanism for connecting notes in mrkdwn.me. They use
 
 The wiki link plugin uses CodeMirror's `ViewPlugin` to detect `[[...]]` patterns in the editor content:
 
-1. A regex scans the visible content for `[[...]]` patterns.
+1. A regex (`/\[\[([^\]]+)\]\]/g`) scans the visible content for `[[...]]` patterns.
 2. Each match is parsed to extract:
    - **Title**: The target note name (before `|` or `#`).
    - **Alias**: Optional display text (after `|`).
@@ -29,21 +29,24 @@ The wiki link plugin uses CodeMirror's `ViewPlugin` to detect `[[...]]` patterns
 
 ### Rendering
 
-Wiki links are rendered as styled inline elements:
+Wiki links are rendered using **replacement widgets** (`WikiLinkWidget extends WidgetType`). The raw `[[...]]` syntax is replaced in the editor view by a `<span>` element via `Decoration.replace()`:
 
-- **Color**: Accent purple (`#7f6df2`)
-- **Style**: Underlined text indicating a clickable link
-- **Cursor**: Pointer cursor on hover
-- **Content**: Shows the alias if present, otherwise the title
+- **Color**: `var(--color-obsidian-link)` (currently `#7f6df2`)
+- **Style**: No underline by default (`text-decoration: none`); underline on hover only
+- **Cursor**: Pointer cursor
+- **Content**: Shows the alias if present (from `|`), otherwise the full inner text (including `#heading` if present)
+- **Click handler**: Each widget has a click listener that calls the injected `navigateToNote` callback
 
 ### Navigation
 
 When a user clicks a wiki link:
 
-1. The click handler extracts the target title from the link.
-2. It searches the current vault's notes for a matching title.
-3. If found, it dispatches `OPEN_NOTE` to the workspace context, opening the linked note in the current pane.
-4. The navigation callback is injected via `setWikiLinkNavigator()` — a function set by the `MarkdownEditor` component at mount time.
+1. The widget's click handler calls the `navigateToNote(title)` callback.
+2. It searches the current vault's notes for a matching title (case-insensitive via `.toLowerCase()`).
+3. If found, it dispatches `OPEN_NOTE` to the workspace context, opening the linked note in the current pane. If not found, the click is silently ignored (no error, no new note creation).
+4. Two callbacks are injected by the `MarkdownEditor` component at mount time:
+   - `setWikiLinkNavigator()` — for click navigation
+   - `setNoteListProvider()` — for autocomplete (provides the in-memory note list synchronously)
 
 ### Autocomplete
 
@@ -51,11 +54,11 @@ When a user clicks a wiki link:
 
 **Behavior**:
 
-1. The autocomplete extension monitors for the `[[` trigger pattern.
-2. On trigger, it fetches the list of all notes in the current vault.
-3. Notes are filtered by the text typed after `[[`.
+1. The autocomplete extension monitors for the `[[` trigger via regex `/\[\[\w*/`. **Note:** This regex only matches word characters (`[a-zA-Z0-9_]`) after `[[`, so autocomplete stops working if a space or special character is typed.
+2. On trigger, it calls the injected `getNoteList()` provider synchronously (no network request — the note list is already in memory).
+3. Notes are filtered by case-insensitive substring matching (`.toLowerCase().includes(query)`).
 4. Results are displayed in a dropdown list.
-5. Selecting a result inserts `[[Note Title]]` and closes the autocomplete.
+5. Selecting a result applies `${n.title}]]` starting from after the `[[` prefix, producing the complete `[[Note Title]]`.
 
 **Implementation**: Uses `@codemirror/autocomplete` with a custom completion source registered for the `[[` context.
 
@@ -78,7 +81,7 @@ Finds all notes that link to the specified note.
   1. Fetch the target note to get its title.
   2. Fetch all notes in the same vault.
   3. For each note, check if its content contains `[[Target Title]]`, `[[Target Title|`, or `[[Target Title#`.
-  4. For matching notes, extract a context snippet (the line containing the link).
+  4. For matching notes, extract a context snippet (the first matching line containing the link — uses `Array.find()`). The target note itself is excluded from the scan.
   5. Return an array of `{ noteId, noteTitle, context }` objects.
 - **Returns**: Array of backlink objects with note ID, title, and surrounding context.
 
@@ -90,9 +93,9 @@ Finds notes that mention the target note's title in plain text (not inside `[[..
 - **Algorithm**:
   1. Fetch the target note to get its title.
   2. Fetch all notes in the same vault.
-  3. For each note, check if its content contains the title as plain text.
-  4. Exclude cases where the mention is inside `[[...]]` brackets (those are backlinks, not unlinked mentions).
-  5. Extract a context snippet around the mention.
+  3. For each note, check if its content contains the title as plain text (case-insensitive via `.toLowerCase()`). The target note itself is excluded.
+  4. Exclude cases where the mention is inside `[[...]]` brackets using a heuristic: checks if the text before the mention has an unmatched `[[` (i.e., `lastIndexOf("[[") > lastIndexOf("]]")`).
+  5. Extract the entire trimmed line containing the first matching mention (only the first qualifying line per note is reported, due to a `break` statement).
 - **Returns**: Array of unlinked mention objects.
 
 ### Backlinks Panel

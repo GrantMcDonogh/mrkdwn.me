@@ -2,146 +2,171 @@
 
 ## Overview
 
-mrkdwn.me uses [Convex Auth](https://labs.convex.dev/auth) (`@convex-dev/auth`) for authentication, supporting both email/password credentials and Google OAuth. All backend operations require authentication — unauthenticated users are shown a sign-in page.
-
-## Providers
-
-### Email / Password
-
-- Users can **sign up** with an email and password, or **sign in** with existing credentials.
-- The sign-up flow is selected via a toggle on the auth page; the default view is "Sign In".
-- Implemented via the `Password` provider from `@convex-dev/auth/providers/Password`.
-
-### Google OAuth
-
-- Users can authenticate with their Google account in a single click.
-- Implemented via the `Google` provider from `@auth/core/providers/google`.
-- OAuth callback routes are registered automatically in `convex/http.ts`.
+mrkdwn.me uses [Clerk](https://clerk.com) (`@clerk/clerk-react`) for authentication. The Clerk-hosted `<SignIn>` component handles all login/signup UI, including email/password and any OAuth providers configured in the Clerk dashboard. All backend operations require authentication — unauthenticated users are shown the Clerk sign-in page.
 
 ## Architecture
 
 ### Backend Configuration
-
-**`convex/auth.ts`**
-
-```typescript
-import Google from "@auth/core/providers/google";
-import { Password } from "@convex-dev/auth/providers/Password";
-import { convexAuth } from "@convex-dev/auth";
-
-export const { auth, signIn, signOut, store } = convexAuth({
-  providers: [Password, Google],
-});
-```
-
-- Exports `auth` (for session verification in queries/mutations), `signIn`, `signOut`, and `store`.
-- The `auth` tables (users, sessions, accounts, etc.) are automatically added to the Convex schema via `authTables` in `convex/schema.ts`.
 
 **`convex/auth.config.ts`**
 
 ```typescript
 export default {
   providers: [
-    { domain: "https://accounts.google.com", applicationID: "google" },
+    {
+      domain: process.env.CLERK_JWT_ISSUER_DOMAIN,
+      applicationID: "convex",
+    },
   ],
 };
 ```
 
-- Configures the Google OAuth domain and application identifier.
+- Configures Convex to validate JWTs issued by the Clerk instance specified in `CLERK_JWT_ISSUER_DOMAIN`.
+- The `applicationID` `"convex"` matches the JWT template name configured in the Clerk dashboard.
 
 **`convex/http.ts`**
 
 ```typescript
+import { httpRouter } from "convex/server";
+import { chat } from "./chat";
+
 const http = httpRouter();
-auth.addHttpRoutes(http);
+
+http.route({ path: "/api/chat", method: "POST", handler: chat });
+http.route({ path: "/api/chat", method: "OPTIONS", handler: chat });
+
 export default http;
 ```
 
-- Registers OAuth callback HTTP routes required by the Google provider.
+- There are no auth-related HTTP routes. OAuth callbacks are handled entirely by Clerk's hosted infrastructure.
+- The only HTTP routes are for the `/api/chat` AI streaming endpoint.
 
 ### Frontend Integration
 
 **`src/main.tsx`**
 
 ```tsx
-<ConvexAuthProvider client={convex}>
-  <BrowserRouter>
-    <App />
-  </BrowserRouter>
-</ConvexAuthProvider>
+<StrictMode>
+  <ClerkProvider
+    publishableKey={import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string}
+    signInForceRedirectUrl={window.location.origin + "/"}
+    signUpForceRedirectUrl={window.location.origin + "/"}
+  >
+    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ConvexProviderWithClerk>
+  </ClerkProvider>
+</StrictMode>
 ```
 
-- The `ConvexAuthProvider` wraps the entire application, providing auth state to all components.
+- `ClerkProvider` wraps the entire application, providing Clerk auth state.
+- `ConvexProviderWithClerk` bridges Clerk sessions to Convex, passing JWTs to the backend automatically.
+- The `useAuth` hook from Clerk is passed to `ConvexProviderWithClerk` so Convex can obtain auth tokens.
 
 **`src/App.tsx`**
 
 ```tsx
-const { isAuthenticated, isLoading } = useConvexAuth();
+export default function App() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
 
-if (isLoading) return <LoadingScreen />;
-if (!isAuthenticated) return <AuthPage />;
-return <VaultSelector />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-obsidian-bg flex items-center justify-center">
+        <p className="text-obsidian-text-muted">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
+  return (
+    <WorkspaceProvider>
+      <AppRouter />
+    </WorkspaceProvider>
+  );
+}
 ```
 
-- Uses the `useConvexAuth()` hook to determine auth status.
-- Shows a loading spinner during session check.
-- Redirects unauthenticated users to `AuthPage`.
-- Authenticated users proceed to `VaultSelector`.
+- Uses `useConvexAuth()` to check authentication status.
+- Shows an inline loading indicator while the session is being verified.
+- Renders `<AuthPage />` for unauthenticated users.
+- Authenticated users get `<WorkspaceProvider>` wrapping `<AppRouter />`, which conditionally renders `<VaultSelector />` or `<AppLayout />`.
 
 ## Auth Page UI
 
 **File:** `src/components/auth/AuthPage.tsx`
 
-### Layout
+```tsx
+import { SignIn } from "@clerk/clerk-react";
 
-- Centered card on a dark background (`bg-obsidian-bg`).
-- Application branding with the mrkdwn.me logo and tagline.
-- Toggle between "Sign In" and "Sign Up" modes via a text link.
+export default function AuthPage() {
+  return (
+    <div className="min-h-screen bg-obsidian-bg flex items-center justify-center p-4">
+      <SignIn
+        appearance={{ variables: { colorPrimary: "#7f6df2" } }}
+        forceRedirectUrl={window.location.origin + "/"}
+      />
+    </div>
+  );
+}
+```
 
-### Sign In / Sign Up Form
-
-| Field | Type | Validation |
-|-------|------|-----------|
-| Email | `<input type="email">` | Required |
-| Password | `<input type="password">` | Required |
-
-- Submit triggers `signIn("password", formData)` with a `flow` field set to `"signUp"` or `"signIn"`.
-- Error handling: catches auth errors and displays a message (e.g., "Could not sign in. Check your credentials.").
-
-### Google Sign-In
-
-- A separate button styled with a Google icon (SVG).
-- Triggers `signIn("google")`, which redirects to the Google consent screen.
-- On success, the OAuth callback redirects back and the session is established.
+- Renders Clerk's pre-built `<SignIn />` component with a custom accent color (`#7f6df2`).
+- All login UI (form fields, OAuth buttons, toggle between sign-in/sign-up, error handling) is managed by Clerk.
+- The available authentication methods (email/password, Google, etc.) are configured in the Clerk dashboard, not in code.
 
 ## Authorization
 
 All backend queries and mutations enforce authentication:
 
 ```typescript
-const userId = await auth.getUserId(ctx);
-if (!userId) throw new Error("Not authenticated");
+const identity = await ctx.auth.getUserIdentity();
+if (!identity) throw new Error("Not authenticated");
+const userId = identity.tokenIdentifier;
 ```
 
-- Every Convex function checks for a valid session via `auth.getUserId(ctx)`.
-- Throws immediately if the session is invalid or expired.
+- Every Convex function calls `ctx.auth.getUserIdentity()` to verify the JWT.
+- The `tokenIdentifier` string from the identity object is used as the user ID for data ownership.
+- Throws immediately if no valid identity is present.
 
 ### Data Isolation
 
-- **Vaults** are filtered by `userId` — users can only see and modify their own vaults.
-- **Folders and Notes** are accessed through vaults, inheriting the vault's ownership check.
+- **Vaults** are filtered by `userId` (the Clerk `tokenIdentifier`) — users can only see and modify their own vaults.
+- **Folders and Notes** are accessed through vaults, inheriting the vault's ownership check via a `verifyVaultOwnership()` helper.
 - There is no shared/collaborative access model — each user's data is fully isolated.
+
+## Sign Out
+
+Sign-out is available on the Vault Selector page via `useClerk().signOut()`:
+
+```tsx
+import { useClerk } from "@clerk/clerk-react";
+
+const { signOut } = useClerk();
+// ...
+<button onClick={() => signOut()}>Sign Out</button>
+```
 
 ## Session Lifecycle
 
-1. **Sign Up**: User submits email + password → account created in Convex `users` table → session token issued → client authenticated.
-2. **Sign In**: User submits credentials → validated against stored account → session token issued → client authenticated.
-3. **OAuth**: User clicks Google → redirected to Google consent → callback to Convex HTTP route → account linked/created → session token issued → client authenticated.
-4. **Session Persistence**: Convex Auth manages session tokens; the `ConvexAuthProvider` restores sessions across page reloads.
-5. **Sign Out**: User can sign out (mechanism available via `useAuthActions().signOut()`), destroying the session.
+1. **Sign In/Up**: User interacts with the Clerk `<SignIn>` component → Clerk handles credential validation or OAuth flow → JWT issued → `ConvexProviderWithClerk` forwards the token to Convex → client authenticated.
+2. **Session Persistence**: Clerk manages session tokens and restores sessions across page reloads. The `ClerkProvider` handles token refresh automatically.
+3. **Sign Out**: User clicks "Sign Out" on the vault selector → `useClerk().signOut()` is called → Clerk destroys the session → `useConvexAuth()` returns `isAuthenticated: false` → UI switches to `<AuthPage />`.
 
 ## Security Considerations
 
-- Passwords are hashed and managed by the Convex Auth Password provider (server-side).
-- OAuth tokens are handled server-side through Convex HTTP routes — no client-side token exposure.
-- All API calls require a valid session token; there are no public/unauthenticated endpoints for data access.
+- User accounts and credentials are managed entirely by Clerk's hosted infrastructure — no sensitive auth data is stored in Convex.
+- JWTs are validated server-side by Convex using the Clerk issuer domain configured in `convex/auth.config.ts`.
+- All Convex queries and mutations require a valid JWT; there are no public/unauthenticated endpoints for data access.
+- There is no `users` table in the Convex schema — user identity is derived from the Clerk JWT's `tokenIdentifier`.
+
+## Environment Variables
+
+| Variable | Location | Description |
+|----------|----------|-------------|
+| `VITE_CLERK_PUBLISHABLE_KEY` | Frontend (.env.local) | Clerk publishable key for the `<ClerkProvider>` |
+| `CLERK_JWT_ISSUER_DOMAIN` | Convex env vars | Clerk JWT issuer domain for backend token validation |

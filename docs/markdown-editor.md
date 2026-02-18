@@ -39,9 +39,9 @@ The editor is configured with the following CodeMirror extensions:
 
 ### Initialization
 
-1. The component receives a `noteId` prop.
-2. Note data is fetched via `useQuery(api.notes.get, { id: noteId })`.
-3. On mount (or when `noteId` changes), a new `EditorView` is created.
+1. The component receives a `noteId` prop and accesses workspace context via `useWorkspace()` for `vaultId` and `dispatch`.
+2. Note data is fetched via `useQuery(api.notes.get, { id: noteId })`. All vault notes are also fetched via `useQuery(api.notes.list, { vaultId })` for wiki link autocomplete and navigation.
+3. On mount (or when `noteId` changes), a new `EditorView` is created. Wiki link navigation (`setWikiLinkNavigator`) and note list provider (`setNoteListProvider`) callbacks are injected.
 4. The editor state is initialized with the note's `content`.
 5. All extensions are applied.
 6. The view is attached to the component's container `div`.
@@ -52,16 +52,16 @@ When the note's content changes externally (e.g., from a wiki link rename):
 
 1. The `useQuery` hook returns updated note data.
 2. The component checks if the editor's current content differs from the server content.
-3. If different and the editor is not currently focused (user not actively typing), the editor state is replaced with the server content.
+3. If different and the editor is not currently focused (`!view.hasFocus`), the document content is replaced via a `view.dispatch()` transaction (preserving undo history and editor state).
 4. This prevents overwriting the user's in-progress edits while keeping the editor in sync.
 
 ### Cleanup
 
 On unmount:
 
-1. Any pending save timeout is cleared and the save is flushed immediately.
-2. The `EditorView` is destroyed.
-3. Event listeners are removed.
+1. Any pending save timeout is cleared and the save is flushed immediately (but only if content has changed since last save — a dedup check via `lastSavedContentRef`).
+2. The `EditorView` is destroyed via `view.destroy()`.
+3. The view ref is nulled (`viewRef.current = null`).
 
 ## Auto-Save
 
@@ -77,7 +77,10 @@ On unmount:
 ```
 User types → EditorView.updateListener fires
   → clearTimeout(existing timer)
-  → setTimeout(500ms) → notes.update(noteId, content)
+  → setTimeout(500ms) → save(content)
+    → if content !== lastSavedContentRef.current:
+      → updateNote({ id: noteId, content })
+      → lastSavedContentRef.current = content
 ```
 
 ## Live Preview Mode
@@ -90,28 +93,31 @@ The live preview plugin provides inline visual formatting of Markdown syntax wit
 
 | Element | Syntax | Rendering |
 |---------|--------|-----------|
-| Heading 1 | `# text` | Large bold text (1.8em) |
-| Heading 2 | `## text` | Medium-large bold text (1.5em) |
-| Heading 3 | `### text` | Medium bold text (1.3em) |
-| Heading 4 | `#### text` | Slightly larger bold text (1.1em) |
-| Heading 5-6 | `##### text` | Bold text (1em) |
+| Heading 1 | `# text` | 2em, font-weight 700 |
+| Heading 2 | `## text` | 1.6em, font-weight 600 |
+| Heading 3 | `### text` | 1.3em, font-weight 600 |
+| Heading 4 | `#### text` | 1.1em, font-weight 600 |
+| Heading 5-6 | `##### text` | Clamped to H4 styling (level capped at 4 via `Math.min(level, 4)`) |
 | Bold | `**text**` | Bold weight |
 | Italic | `*text*` | Italic style |
 | Inline code | `` `text` `` | Monospace with background |
-| Blockquote | `> text` | Left border + italic + muted color |
-| Task (unchecked) | `- [ ] text` | Checkbox indicator (unchecked) |
-| Task (checked) | `- [x] text` | Checkbox indicator (checked, strikethrough) |
-| Horizontal rule | `---` / `***` | Styled divider line |
-| Tags | `#tag-name` | Purple background pill styling |
+| Blockquote | `> text` | Left border (3px solid accent) + muted color (no italic) |
+| Task (unchecked) | `- [ ] text` | Interactive checkbox (clicking toggles `[ ]`/`[x]` in source) |
+| Task (checked) | `- [x] text` | Interactive checked checkbox (no strikethrough) |
+| Horizontal rule | `---` / `***` | Styled divider line (Decoration.replace with HrWidget) |
+| Tags | `#tag-name` | Accent text color with subtle 10% opacity background (`var(--color-obsidian-accent)`) |
 
 ### Implementation
 
 The live preview uses CodeMirror's `ViewPlugin` and `DecorationSet`:
 
 1. A `ViewPlugin` iterates over the visible document range.
-2. For each line, it checks for Markdown patterns using the syntax tree.
-3. Matching patterns receive `Decoration.mark()` or `Decoration.line()` decorations.
-4. Decorations apply CSS classes that provide the visual styling.
+2. For most elements, it uses the syntax tree to detect Markdown patterns.
+3. Tags are detected separately via regex scan (`/(?:^|\s)(#[a-zA-Z][a-zA-Z0-9_-]*)/g`) outside the syntax tree iteration.
+4. Three types of decorations are used:
+   - `Decoration.line()` for headings and blockquotes (applies CSS classes to the line).
+   - `Decoration.mark()` for inline formatting (bold, italic, code, tags).
+   - `Decoration.replace()` with widgets for task checkboxes (`CheckboxWidget`) and horizontal rules (`HrWidget`).
 5. The plugin efficiently updates only when the viewport or document changes.
 
 ## Editor Theming
@@ -123,21 +129,30 @@ The editor applies the One Dark theme as a base, with custom overrides in `src/i
 ```css
 .cm-editor {
   height: 100%;
-  background: var(--color-obsidian-bg);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', ...;
+  font-size: 16px;
 }
 
 .cm-editor .cm-content {
   padding: 16px 24px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', ...;
 }
 
-.cm-editor .cm-activeLine {
+.cm-editor .cm-scroller {
+  overflow: auto;
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor .cm-activeLine,
+.cm-editor .cm-activeLineGutter {
   background-color: rgba(255, 255, 255, 0.03);
 }
 
 .cm-editor .cm-gutters {
   background: var(--color-obsidian-bg);
-  border-right: 1px solid var(--color-obsidian-border);
+  border-right: none;
 }
 ```
 
@@ -156,6 +171,8 @@ The editor follows the Obsidian dark theme:
 | Prop | Type | Description |
 |------|------|-------------|
 | `noteId` | `Id<"notes">` | The ID of the note to edit |
+
+The component also depends on `useWorkspace()` context for `vaultId` (used to fetch all notes for wiki link features) and `dispatch` (used for `OPEN_NOTE` action when clicking wiki links).
 
 ## Key Behaviors
 
