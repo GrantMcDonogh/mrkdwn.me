@@ -108,7 +108,8 @@ Command Palette Modal
 │   ├── ▸ Open Graph View
 │   ├── ▸ Toggle Search
 │   ├── ▸ Toggle Chat
-│   └── ▸ Manage Vaults
+│   ├── ▸ Manage Vaults
+│   └── ▸ Toggle Preview/Edit Mode
 └── (Close on Escape or click outside)
 ```
 
@@ -124,6 +125,7 @@ Command Palette Modal
 | Toggle Search | Show/hide search in right panel | `{ type: "SET_RIGHT_PANEL", panel: "search" }` |
 | Toggle Chat | Show/hide chat in right panel | `{ type: "SET_RIGHT_PANEL", panel: "chat" }` |
 | Manage Vaults | Return to vault selector | `LEAVE_VAULT` |
+| Toggle Preview/Edit Mode | Toggle active note tab between preview and edit | `TOGGLE_TAB_MODE` (active pane/tab) |
 
 ### Interaction
 
@@ -207,6 +209,7 @@ Quick Switcher Modal
 |----------|---------|
 | `Ctrl/Cmd + P` | Open Command Palette |
 | `Ctrl/Cmd + O` | Open Quick Switcher |
+| `Ctrl/Cmd + E` | Toggle Preview/Edit Mode |
 | `Ctrl/Cmd + F` | Find in editor (CodeMirror built-in search) |
 
-`Ctrl+P` and `Ctrl+O` are registered as global `keydown` event listeners in the `AppLayout` component. `Ctrl+F` is a built-in CodeMirror keybinding, not registered by the application.
+`Ctrl+P`, `Ctrl+O`, and `Ctrl+E` are registered as global `keydown` event listeners in the `AppLayout` component. `Ctrl+F` is a built-in CodeMirror keybinding, not registered by the application.

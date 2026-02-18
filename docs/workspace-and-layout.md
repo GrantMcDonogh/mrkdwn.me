@@ -31,6 +31,7 @@ interface Tab {
   id: string;
   type: "note" | "graph";
   noteId?: Id<"notes">; // present when type === "note"
+  mode?: "preview" | "edit"; // present when type === "note", defaults to "preview"
 }
 ```
 
@@ -50,16 +51,18 @@ interface Tab {
 | `TOGGLE_SIDEBAR` | — | Toggle left sidebar visibility |
 | `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/search/chat) or `null` to close |
 | `SET_SEARCH_QUERY` | `query` | Update the search query string |
+| `TOGGLE_TAB_MODE` | `paneId, tabId` | Toggle a note tab between preview and edit mode (no-op for graph tabs) |
 
 ### Reducer Logic
 
 Key behaviors of the state reducer:
 
-- **`OPEN_NOTE`**: If a tab for the note already exists in the active pane, it activates that tab. Otherwise, a new tab (with `type: "note"`) is created and activated.
+- **`OPEN_NOTE`**: If a tab for the note already exists in the active pane, it activates that tab. Otherwise, a new tab (with `type: "note"`, `mode: "preview"`) is created and activated.
 - **`OPEN_GRAPH`**: If the active pane already has a graph tab, it activates that tab. Otherwise, a new tab (with `type: "graph"`) is created and activated. Only one graph tab per pane.
 - **`CLOSE_TAB`**: Removes the tab. If it was the active tab, the previous tab becomes active. If no tabs remain, `activeTabId` is set to `null`.
 - **`SPLIT_PANE`**: Creates a second pane. Maximum of 2 panes. If already split, this is a no-op.
 - **`CLOSE_PANE`**: Removes the specified pane and reverts to single-pane mode. Tabs from the closed pane are discarded.
+- **`TOGGLE_TAB_MODE`**: Finds the tab in the specified pane. If it's a note tab, toggles `mode` between `"preview"` and `"edit"`. No-op for graph tabs.
 - **`SET_RIGHT_PANEL`**: If the same panel is set again, it toggles off (set to `null`).
 - **`LEAVE_VAULT`**: Resets the entire workspace state to defaults.
 
@@ -124,6 +127,7 @@ Registered in `AppLayout`:
 |----------|--------|
 | `Ctrl/Cmd + P` | Open Command Palette |
 | `Ctrl/Cmd + O` | Open Quick Switcher |
+| `Ctrl/Cmd + E` | Toggle Preview/Edit Mode on the active note tab |
 
 ---
 
@@ -173,24 +177,29 @@ Each pane has its own tab bar displaying open tabs. Tabs can be either **note ta
 |---------|----------|-----------|
 | Icon | — | `GitFork` icon (size 14) |
 | Label | Note title (fetched from note data) | "Graph" (static text) |
+| Mode toggle | Eye/Pencil icon (size 12), visible on hover, between title and close button | — |
 | Close button | Lucide `X` icon (size 12), visible on hover | Same |
 | Active indicator | Background highlight on the active tab | Same |
 | Inactive style | Muted background | Same |
+
+The mode toggle icon reflects the tab's current mode: **Eye** icon when in preview mode, **Pencil** icon when in edit mode. Clicking it dispatches `TOGGLE_TAB_MODE`.
 
 ### Interactions
 
 | Action | Behavior |
 |--------|----------|
 | Click tab | `SET_ACTIVE_TAB` — switches to that tab |
+| Click mode icon | `TOGGLE_TAB_MODE` — toggles between preview and edit mode |
 | Click close (×) | `CLOSE_TAB` — closes the tab |
 | Click pane area | `SET_ACTIVE_PANE` — focuses that pane |
 
 ### Tab Lifecycle
 
-1. **Open note** (`OPEN_NOTE`): If the note is already open in the active pane, that tab activates. Otherwise, a new note tab is appended and activated.
+1. **Open note** (`OPEN_NOTE`): If the note is already open in the active pane, that tab activates. Otherwise, a new note tab is appended and activated with `mode: "preview"` (notes open in preview mode by default).
 2. **Open graph** (`OPEN_GRAPH`): If a graph tab already exists in the active pane, it activates. Otherwise, a new graph tab is created. Only one graph tab per pane.
 3. **Close tab** (`CLOSE_TAB`): Tab is removed. If it was active, the previous sibling tab activates; if no previous sibling exists, the first remaining tab activates. If no tabs remain, `activeTabId` is set to `null` and the pane shows an empty state.
-4. **Multiple panes**: Each pane maintains its own independent list of tabs. The same note can be open in tabs across different panes.
+4. **Mode per tab**: Each note tab tracks its own `mode` ("preview" or "edit"). Switching tabs preserves each tab's mode independently.
+5. **Multiple panes**: Each pane maintains its own independent list of tabs. The same note can be open in tabs across different panes.
 
 ---
 

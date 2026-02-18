@@ -17,6 +17,7 @@ mrkdwn.me is a cloud-based knowledge management system inspired by [Obsidian](ht
 | Authentication | @clerk/clerk-react | ^5.25.3 |
 | Editor | CodeMirror 6 | 6.x (multiple packages) |
 | Graph Visualization | D3.js | 7.9.0 |
+| Markdown Rendering | react-markdown + remark-gfm | latest |
 | Icons | lucide-react | 0.574.0 |
 
 ## Architecture
@@ -71,7 +72,7 @@ mrkdwn-me/
 │   │   ├── backlinks/            # Backlinks panel
 │   │   ├── chat/                 # AI chat panel (Claude RAG)
 │   │   ├── command-palette/      # Command palette & quick switcher
-│   │   ├── editor/               # Markdown editor, wiki links, live preview
+│   │   ├── editor/               # Markdown editor, preview, wiki links, live preview
 │   │   ├── explorer/             # File tree explorer
 │   │   ├── graph/                # D3.js graph visualization
 │   │   ├── layout/               # App layout, sidebar, split panes, tabs
