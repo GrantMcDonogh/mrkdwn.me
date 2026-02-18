@@ -12,6 +12,7 @@ import type * as chat from "../chat.js";
 import type * as chatHelpers from "../chatHelpers.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
+import type * as importVault from "../importVault.js";
 import type * as notes from "../notes.js";
 import type * as vaults from "../vaults.js";
 
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   chatHelpers: typeof chatHelpers;
   folders: typeof folders;
   http: typeof http;
+  importVault: typeof importVault;
   notes: typeof notes;
   vaults: typeof vaults;
 }>;

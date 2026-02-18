@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 export const list = query({
@@ -38,6 +38,18 @@ export const create = mutation({
       name: args.name,
       userId,
       createdAt: Date.now(),
+    });
+  },
+});
+
+export const importCreateVault = internalMutation({
+  args: { name: v.string(), userId: v.string(), settings: v.optional(v.any()) },
+  handler: async (ctx, args) => {
+    return ctx.db.insert("vaults", {
+      name: args.name,
+      userId: args.userId,
+      createdAt: Date.now(),
+      settings: args.settings,
     });
   },
 });

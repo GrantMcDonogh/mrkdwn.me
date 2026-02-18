@@ -1,0 +1,2 @@
+- Personal AI assistant
+- Citizen reboot

@@ -1,5 +1,6 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 async function verifyVaultOwnership(
   ctx: { db: { get: (id: any) => Promise<any> } },
@@ -11,6 +12,38 @@ async function verifyVaultOwnership(
     throw new Error("Vault not found");
   }
 }
+
+export const importBatch = internalMutation({
+  args: {
+    folders: v.array(
+      v.object({
+        tempId: v.string(),
+        name: v.string(),
+        vaultId: v.id("vaults"),
+        parentTempId: v.optional(v.string()),
+        order: v.number(),
+      })
+    ),
+    parentIdMap: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const newMappings: Record<string, string> = {};
+    for (const folder of args.folders) {
+      const parentId = folder.parentTempId
+        ? ((args.parentIdMap[folder.parentTempId] ??
+            newMappings[folder.parentTempId]) as Id<"folders"> | undefined)
+        : undefined;
+      const id = await ctx.db.insert("folders", {
+        name: folder.name,
+        vaultId: folder.vaultId,
+        parentId,
+        order: folder.order,
+      });
+      newMappings[folder.tempId] = id;
+    }
+    return newMappings;
+  },
+});
 
 export const list = query({
   args: { vaultId: v.id("vaults") },

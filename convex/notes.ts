@@ -12,6 +12,43 @@ async function verifyVaultOwnership(
   }
 }
 
+export const importBatch = mutation({
+  args: {
+    notes: v.array(
+      v.object({
+        title: v.string(),
+        content: v.string(),
+        vaultId: v.id("vaults"),
+        folderId: v.optional(v.id("folders")),
+        order: v.number(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    if (args.notes.length > 0) {
+      await verifyVaultOwnership(
+        ctx,
+        args.notes[0]!.vaultId,
+        identity.tokenIdentifier
+      );
+    }
+    const now = Date.now();
+    for (const note of args.notes) {
+      await ctx.db.insert("notes", {
+        title: note.title,
+        content: note.content,
+        vaultId: note.vaultId,
+        folderId: note.folderId,
+        order: note.order,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+});
+
 export const list = query({
   args: { vaultId: v.id("vaults") },
   handler: async (ctx, args) => {

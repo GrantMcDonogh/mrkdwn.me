@@ -1,0 +1,3 @@
+- Aquaponics
+- Energy generation
+- Energy storage

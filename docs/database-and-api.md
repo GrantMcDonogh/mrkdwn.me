@@ -18,6 +18,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 │ name         │
 │ userId ──────┼──→ Clerk tokenIdentifier (string)
 │ createdAt    │
+│ settings?    │
 │ idx: by_user │
 └──────┬───────┘
        │ 1
@@ -54,6 +55,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `name` | `v.string()` | Vault display name |
 | `userId` | `v.string()` | Clerk `tokenIdentifier` identifying the owning user |
 | `createdAt` | `v.number()` | Creation timestamp (ms since epoch) |
+| `settings` | `v.optional(v.any())` | Imported Obsidian settings (editor, appearance, graph). See [Import Vault](./import-vault.md). |
 
 **Indexes:**
 - `by_user` → `["userId"]` — Lookup vaults by owner
@@ -108,6 +110,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `vaults.create` | Mutation | `{ name }` | `Id<"vaults">` | Create vault |
 | `vaults.rename` | Mutation | `{ id, name }` | — | Rename vault |
 | `vaults.remove` | Mutation | `{ id }` | — | Delete vault + all contents |
+| `vaults.importCreateVault` | Internal Mutation | `{ name, userId, settings? }` | `Id<"vaults">` | Create vault (called from import action) |
 
 ### Folder Operations
 
@@ -120,6 +123,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `folders.rename` | Mutation | `{ id, name }` | — | Rename folder |
 | `folders.move` | Mutation | `{ id, parentId? }` | — | Move folder to new parent |
 | `folders.remove` | Mutation | `{ id }` | — | Delete folder (children promoted) |
+| `folders.importBatch` | Internal Mutation | `{ folders, parentIdMap }` | `Record<string, string>` | Batch-create folders with tempId mapping (called from import action) |
 
 ### Note Operations
 
@@ -137,6 +141,15 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `notes.search` | Query | `{ vaultId, query }` | `Note[]` | Full-text search via dual-index (title + content), merged, deduped, max 20 results |
 | `notes.getBacklinks` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get notes linking to this note |
 | `notes.getUnlinkedMentions` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get unlinked title mentions |
+| `notes.importBatch` | Mutation | `{ notes }` | — | Batch-create notes (called from client during vault import) |
+
+### Import Operations
+
+**File:** `convex/importVault.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `importVault.createVaultWithFolders` | Action | `{ name, settings?, folders }` | `{ vaultId, folderIdMap }` | Orchestrates vault + folder creation server-side. See [Import Vault](./import-vault.md). |
 
 ### Chat Operations
 

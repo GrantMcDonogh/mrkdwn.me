@@ -6,6 +6,7 @@ export default defineSchema({
     name: v.string(),
     userId: v.string(),
     createdAt: v.number(),
+    settings: v.optional(v.any()),
   }).index("by_user", ["userId"]),
 
   folders: defineTable({

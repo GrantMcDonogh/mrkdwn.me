@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "convex/react";
 import { useClerk } from "@clerk/clerk-react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
-import { Pencil, Trash2, Plus, LogOut } from "lucide-react";
+import { Pencil, Trash2, Plus, LogOut, Upload } from "lucide-react";
+import ImportVaultDialog from "./ImportVaultDialog";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export default function VaultSelector() {
@@ -18,6 +19,7 @@ export default function VaultSelector() {
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<Id<"vaults"> | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [showImport, setShowImport] = useState(false);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
@@ -130,13 +132,22 @@ export default function VaultSelector() {
             </button>
           </form>
         ) : (
-          <button
-            onClick={() => setCreating(true)}
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-obsidian-bg-secondary border border-dashed border-obsidian-border rounded-lg p-4 text-obsidian-text-muted hover:text-obsidian-text hover:border-obsidian-accent/50 transition-colors"
-          >
-            <Plus size={18} />
-            Create New Vault
-          </button>
+          <div className="mt-4 grid gap-3">
+            <button
+              onClick={() => setCreating(true)}
+              className="w-full flex items-center justify-center gap-2 bg-obsidian-bg-secondary border border-dashed border-obsidian-border rounded-lg p-4 text-obsidian-text-muted hover:text-obsidian-text hover:border-obsidian-accent/50 transition-colors"
+            >
+              <Plus size={18} />
+              Create New Vault
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              className="w-full flex items-center justify-center gap-2 bg-obsidian-bg-secondary border border-dashed border-obsidian-border rounded-lg p-4 text-obsidian-text-muted hover:text-obsidian-text hover:border-obsidian-accent/50 transition-colors"
+            >
+              <Upload size={18} />
+              Import Vault
+            </button>
+          </div>
         )}
 
         {vaults?.length === 0 && !creating && (
@@ -145,6 +156,9 @@ export default function VaultSelector() {
           </p>
         )}
       </div>
+      {showImport && (
+        <ImportVaultDialog onClose={() => setShowImport(false)} />
+      )}
     </div>
   );
 }
