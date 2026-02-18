@@ -132,7 +132,8 @@ The vault selector is the first screen shown after authentication. It displays a
 
 ### Vault Navigation
 
-- From within the app layout, users can return to the vault selector via the command palette ("Switch Vault" command).
+- The sidebar header contains a **Vault Switcher** dropdown that lists all vaults. Clicking a different vault dispatches `SET_VAULT` to switch inline. A "Manage Vaults..." option dispatches `LEAVE_VAULT` to return to the full-page vault selector.
+- The command palette also provides a "Manage Vaults" command that dispatches `LEAVE_VAULT`.
 - Switching vaults clears all open tabs and panes, resetting the workspace state.
 
 ## Ownership & Access Control

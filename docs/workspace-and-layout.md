@@ -134,9 +134,20 @@ Registered in `AppLayout`:
 ### Behavior
 
 - Controlled by `sidebarOpen` in workspace state.
-- When open: renders the `FileExplorer` component with a fixed width (`w-60` / 240px).
+- When open: renders the `VaultSwitcher` and `FileExplorer` components with a fixed width (`w-60` / 240px).
 - When closed: returns `null` (component is not rendered at all, not hidden with width 0).
 - Toggled via the toolbar button or the command palette.
+
+### Vault Switcher
+
+At the top of the sidebar, the `VaultSwitcher` component displays the current vault name with a dropdown for switching between vaults:
+
+- Shows the current vault name with a `Vault` icon and `ChevronDown` indicator.
+- Clicking the button toggles an inline dropdown listing all vaults.
+- The active vault is marked with a `Check` icon.
+- Clicking a different vault dispatches `SET_VAULT` to switch vaults (resets workspace).
+- A "Manage Vaults..." option at the bottom dispatches `LEAVE_VAULT` to return to the full-page vault selector.
+- The dropdown closes when clicking outside of it.
 
 ### Layout
 
@@ -144,7 +155,7 @@ Registered in `AppLayout`:
 - Width: Fixed `w-60` (240px).
 - Background: `obsidian-bg-secondary`.
 - Border: Right border separating from editor area.
-- Content: The `FileExplorer` component (see [file-explorer.md](./file-explorer.md)).
+- Content: `VaultSwitcher` (top, separated by border) + `FileExplorer` (see [file-explorer.md](./file-explorer.md)).
 
 ---
 

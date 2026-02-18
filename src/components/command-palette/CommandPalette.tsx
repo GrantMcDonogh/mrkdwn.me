@@ -46,7 +46,7 @@ export default function CommandPalette({ onClose }: Props) {
       action: () => dispatch({ type: "SET_RIGHT_PANEL", panel: "chat" }),
     },
     {
-      name: "Switch Vault",
+      name: "Manage Vaults",
       action: () => dispatch({ type: "LEAVE_VAULT" }),
     },
   ];

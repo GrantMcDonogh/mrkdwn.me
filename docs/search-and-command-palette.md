@@ -108,7 +108,7 @@ Command Palette Modal
 │   ├── ▸ Open Graph View
 │   ├── ▸ Toggle Search
 │   ├── ▸ Toggle Chat
-│   └── ▸ Switch Vault
+│   └── ▸ Manage Vaults
 └── (Close on Escape or click outside)
 ```
 
@@ -123,7 +123,7 @@ Command Palette Modal
 | Open Graph View | Open graph as editor tab | `{ type: "OPEN_GRAPH" }` |
 | Toggle Search | Show/hide search in right panel | `{ type: "SET_RIGHT_PANEL", panel: "search" }` |
 | Toggle Chat | Show/hide chat in right panel | `{ type: "SET_RIGHT_PANEL", panel: "chat" }` |
-| Switch Vault | Return to vault selector | `LEAVE_VAULT` |
+| Manage Vaults | Return to vault selector | `LEAVE_VAULT` |
 
 ### Interaction
 
