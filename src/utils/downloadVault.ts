@@ -1,22 +1,22 @@
 import JSZip from "jszip";
 
-interface Folder {
+export interface Folder {
   _id: string;
   name: string;
   parentId?: string;
 }
 
-interface Note {
+export interface Note {
   title: string;
   content: string;
   folderId?: string;
 }
 
-function sanitizeName(name: string): string {
+export function sanitizeName(name: string): string {
   return name.replace(/[/\\:*?"<>|]/g, "_").trim() || "Untitled";
 }
 
-function buildFolderPaths(folders: Folder[]): Map<string, string> {
+export function buildFolderPaths(folders: Folder[]): Map<string, string> {
   const map = new Map<string, Folder>();
   for (const f of folders) map.set(f._id, f);
 
@@ -38,11 +38,10 @@ function buildFolderPaths(folders: Folder[]): Map<string, string> {
   return pathCache;
 }
 
-export async function downloadVaultAsZip(
+export async function buildVaultZip(
   folders: Folder[],
   notes: Note[],
-  vaultName: string,
-) {
+): Promise<JSZip> {
   const zip = new JSZip();
   const folderPaths = buildFolderPaths(folders);
 
@@ -72,6 +71,15 @@ export async function downloadVaultAsZip(
     zip.file(filePath, note.content ?? "");
   }
 
+  return zip;
+}
+
+export async function downloadVaultAsZip(
+  folders: Folder[],
+  notes: Note[],
+  vaultName: string,
+) {
+  const zip = await buildVaultZip(folders, notes);
   const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

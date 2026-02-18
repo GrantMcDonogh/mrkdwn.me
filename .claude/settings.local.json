@@ -31,7 +31,8 @@
       "Bash(npx vercel:*)",
       "Bash(npm ls:*)",
       "Bash(python -m base64:*)",
-      "Bash(npx vitest run:*)"
+      "Bash(npx vitest run:*)",
+      "Bash(npx vite build)"
     ]
   }
 }
