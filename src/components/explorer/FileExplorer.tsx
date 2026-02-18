@@ -325,6 +325,15 @@ export default function FileExplorer() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!confirm("Are you sure you want to permanently delete this note?")) return;
+                  // Close any tabs showing this note before deleting
+                  for (const pane of state.panes) {
+                    for (const tab of pane.tabs) {
+                      if (tab.noteId === note._id) {
+                        dispatch({ type: "CLOSE_TAB", paneId: pane.id, tabId: tab.id });
+                      }
+                    }
+                  }
                   removeNote({ id: note._id });
                 }}
                 className="p-0.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-red-400"
