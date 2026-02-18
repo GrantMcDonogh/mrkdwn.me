@@ -1,10 +1,12 @@
 import { httpAction } from "./_generated/server";
 
 export const onboarding = httpAction(async (ctx, request) => {
+  const origin = request.headers.get("Origin") ?? "";
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    Vary: "origin",
   };
 
   if (request.method === "OPTIONS") {

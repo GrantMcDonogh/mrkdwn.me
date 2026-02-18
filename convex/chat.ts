@@ -2,11 +2,13 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 export const chat = httpAction(async (ctx, request) => {
-  // CORS headers
+  // CORS headers — echo the request origin
+  const origin = request.headers.get("Origin") ?? "";
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    Vary: "origin",
   };
 
   if (request.method === "OPTIONS") {
