@@ -3,8 +3,9 @@ import { useQuery, useMutation } from "convex/react";
 import { useClerk } from "@clerk/clerk-react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
-import { Pencil, Trash2, Plus, LogOut, Upload, Download } from "lucide-react";
+import { Pencil, Trash2, Plus, LogOut, Upload, Download, Sparkles } from "lucide-react";
 import ImportVaultDialog from "./ImportVaultDialog";
+import OnboardingWizardDialog from "./OnboardingWizardDialog";
 import { useDownloadVault } from "../../hooks/useDownloadVault";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -21,6 +22,7 @@ export default function VaultSelector() {
   const [editingId, setEditingId] = useState<Id<"vaults"> | null>(null);
   const [editingName, setEditingName] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const downloadVault = useDownloadVault();
 
   async function handleCreate(e: FormEvent) {
@@ -152,6 +154,13 @@ export default function VaultSelector() {
               Create New Vault
             </button>
             <button
+              onClick={() => setShowOnboarding(true)}
+              className="w-full flex items-center justify-center gap-2 bg-obsidian-bg-secondary border border-dashed border-obsidian-border rounded-lg p-4 text-obsidian-text-muted hover:text-obsidian-text hover:border-obsidian-accent/50 transition-colors"
+            >
+              <Sparkles size={18} />
+              Set Up with AI
+            </button>
+            <button
               onClick={() => setShowImport(true)}
               className="w-full flex items-center justify-center gap-2 bg-obsidian-bg-secondary border border-dashed border-obsidian-border rounded-lg p-4 text-obsidian-text-muted hover:text-obsidian-text hover:border-obsidian-accent/50 transition-colors"
             >
@@ -169,6 +178,9 @@ export default function VaultSelector() {
       </div>
       {showImport && (
         <ImportVaultDialog onClose={() => setShowImport(false)} />
+      )}
+      {showOnboarding && (
+        <OnboardingWizardDialog onClose={() => setShowOnboarding(false)} />
       )}
     </div>
   );
