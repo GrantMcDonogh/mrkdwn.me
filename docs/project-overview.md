@@ -18,6 +18,7 @@ mrkdwn.me is a cloud-based knowledge management system inspired by [Obsidian](ht
 | Editor | CodeMirror 6 | 6.x (multiple packages) |
 | Graph Visualization | D3.js | 7.9.0 |
 | Markdown Rendering | react-markdown + remark-gfm | latest |
+| ZIP Generation | JSZip | latest |
 | Icons | lucide-react | 0.574.0 |
 
 ## Architecture
@@ -78,6 +79,10 @@ mrkdwn-me/
 │   │   ├── layout/               # App layout, sidebar, split panes, tabs
 │   │   ├── search/               # Search panel
 │   │   └── vault/                # Vault selection & management
+│   ├── hooks/
+│   │   └── useDownloadVault.ts   # Vault download hook
+│   ├── utils/
+│   │   └── downloadVault.ts      # ZIP building utility
 │   ├── store/
 │   │   └── workspace.tsx         # Global state (Context + Reducer)
 │   ├── App.tsx                   # Root component with auth gating
@@ -180,5 +185,6 @@ npm run lint
 | Database & API | [database-and-api.md](./database-and-api.md) |
 | Real-Time & Sync | [real-time-and-sync.md](./real-time-and-sync.md) |
 | AI Chat (RAG) | [rag-chat.md](./rag-chat.md) |
+| Download / Export Vault | [download-vault.md](./download-vault.md) |
 | Design & Styling | [design-and-styling.md](./design-and-styling.md) |
 | MCP Server | [mcp-server.md](./mcp-server.md) |

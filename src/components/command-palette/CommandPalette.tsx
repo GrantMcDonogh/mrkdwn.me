@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
+import { useDownloadVault } from "../../hooks/useDownloadVault";
 
 interface Command {
   name: string;
@@ -12,6 +15,11 @@ interface Props {
 
 export default function CommandPalette({ onClose }: Props) {
   const [state, dispatch] = useWorkspace();
+  const currentVault = useQuery(
+    api.vaults.get,
+    state.vaultId ? { id: state.vaultId } : "skip"
+  );
+  const downloadVault = useDownloadVault();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,6 +57,14 @@ export default function CommandPalette({ onClose }: Props) {
       name: "Manage Vaults",
       action: () => dispatch({ type: "LEAVE_VAULT" }),
     },
+    ...(state.vaultId && currentVault
+      ? [
+          {
+            name: "Download Vault",
+            action: () => downloadVault(state.vaultId!, currentVault.name),
+          },
+        ]
+      : []),
     {
       name: "Toggle Preview/Edit Mode",
       action: () => {

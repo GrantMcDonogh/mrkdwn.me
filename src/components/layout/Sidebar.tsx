@@ -3,7 +3,8 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
 import FileExplorer from "../explorer/FileExplorer";
-import { Vault, ChevronDown, Check } from "lucide-react";
+import { Vault, ChevronDown, Check, Download } from "lucide-react";
+import { useDownloadVault } from "../../hooks/useDownloadVault";
 
 function VaultSwitcher() {
   const [state, dispatch] = useWorkspace();
@@ -15,6 +16,7 @@ function VaultSwitcher() {
     api.vaults.get,
     state.vaultId ? { id: state.vaultId } : "skip"
   );
+  const downloadVault = useDownloadVault();
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +64,18 @@ function VaultSwitcher() {
             </button>
           ))}
           <div className="border-t border-obsidian-border">
+            {state.vaultId && currentVault && (
+              <button
+                onClick={() => {
+                  downloadVault(state.vaultId!, currentVault.name);
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text-muted hover:bg-obsidian-bg-tertiary"
+              >
+                <Download size={14} className="shrink-0" />
+                Download Vault
+              </button>
+            )}
             <button
               onClick={() => {
                 dispatch({ type: "LEAVE_VAULT" });

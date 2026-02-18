@@ -150,6 +150,7 @@ At the top of the sidebar, the `VaultSwitcher` component displays the current va
 - Clicking the button toggles an inline dropdown listing all vaults.
 - The active vault is marked with a `Check` icon.
 - Clicking a different vault dispatches `SET_VAULT` to switch vaults (resets workspace).
+- A "Download Vault" option exports the current vault as a `.zip` file (see [Download Vault](./download-vault.md)).
 - A "Manage Vaults..." option at the bottom dispatches `LEAVE_VAULT` to return to the full-page vault selector.
 - The dropdown closes when clicking outside of it.
 

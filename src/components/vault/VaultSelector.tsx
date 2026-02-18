@@ -3,8 +3,9 @@ import { useQuery, useMutation } from "convex/react";
 import { useClerk } from "@clerk/clerk-react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
-import { Pencil, Trash2, Plus, LogOut, Upload } from "lucide-react";
+import { Pencil, Trash2, Plus, LogOut, Upload, Download } from "lucide-react";
 import ImportVaultDialog from "./ImportVaultDialog";
+import { useDownloadVault } from "../../hooks/useDownloadVault";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 export default function VaultSelector() {
@@ -20,6 +21,7 @@ export default function VaultSelector() {
   const [editingId, setEditingId] = useState<Id<"vaults"> | null>(null);
   const [editingName, setEditingName] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const downloadVault = useDownloadVault();
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
@@ -93,6 +95,15 @@ export default function VaultSelector() {
                   className="p-1 text-obsidian-text-muted hover:text-obsidian-text rounded hover:bg-obsidian-bg-tertiary"
                 >
                   <Pencil size={14} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    downloadVault(vault._id, vault.name);
+                  }}
+                  className="p-1 text-obsidian-text-muted hover:text-obsidian-text rounded hover:bg-obsidian-bg-tertiary"
+                >
+                  <Download size={14} />
                 </button>
                 <button
                   onClick={(e) => {

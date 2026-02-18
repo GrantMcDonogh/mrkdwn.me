@@ -109,6 +109,7 @@ Command Palette Modal
 │   ├── ▸ Toggle Search
 │   ├── ▸ Toggle Chat
 │   ├── ▸ Manage Vaults
+│   ├── ▸ Download Vault
 │   └── ▸ Toggle Preview/Edit Mode
 └── (Close on Escape or click outside)
 ```
@@ -125,6 +126,7 @@ Command Palette Modal
 | Toggle Search | Show/hide search in right panel | `{ type: "SET_RIGHT_PANEL", panel: "search" }` |
 | Toggle Chat | Show/hide chat in right panel | `{ type: "SET_RIGHT_PANEL", panel: "chat" }` |
 | Manage Vaults | Return to vault selector | `LEAVE_VAULT` |
+| Download Vault | Export current vault as ZIP | Calls `useDownloadVault` hook (conditional: only shown when a vault is active) |
 | Toggle Preview/Edit Mode | Toggle active note tab between preview and edit | `TOGGLE_TAB_MODE` (active pane/tab) |
 
 ### Interaction

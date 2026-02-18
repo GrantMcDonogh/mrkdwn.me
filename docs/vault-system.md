@@ -110,7 +110,7 @@ The vault selector is the first screen shown after authentication. It displays a
 | Element | Description |
 |---------|-------------|
 | Header | "Your Vaults" title with a "Sign Out" button (`LogOut` icon, calls `useClerk().signOut()`) |
-| Vault List | Vertical stack of vault cards, each showing the vault name with hover-reveal action buttons (Pencil for rename, Trash2 for delete) |
+| Vault List | Vertical stack of vault cards, each showing the vault name with hover-reveal action buttons (Pencil for rename, Download for export as ZIP, Trash2 for delete) |
 | Create Button | Full-width dashed-border card with `Plus` icon and "Create New Vault" text |
 | Import Button | Full-width dashed-border card with `Upload` icon and "Import Vault" text. Opens the Import Vault dialog. |
 | Create Form | Inline form with text input, "Create" submit button, and "Cancel" button |
@@ -121,8 +121,9 @@ The vault selector is the first screen shown after authentication. It displays a
 1. **Select Vault**: Clicking a vault card dispatches `SET_VAULT` action, which transitions the UI to the main `AppLayout`.
 2. **Create Vault**: Clicking "Create New Vault" reveals an input field. Submitting calls `vaults.create` mutation.
 3. **Rename Vault**: Double-clicking the Pencil icon on a vault card enables inline editing. On blur or Enter, calls `vaults.rename`. Pressing Escape cancels the rename without saving.
-4. **Delete Vault**: Clicking the Trash2 icon triggers a native `window.confirm()` dialog. On confirm, calls `vaults.remove`.
-5. **Import Vault**: Clicking "Import Vault" opens `ImportVaultDialog`, a modal that guides the user through selecting a local Obsidian vault folder, previewing its contents, and importing all notes, folders, and settings. See [Import Vault](./import-vault.md) for the full flow.
+4. **Download Vault**: Clicking the Download icon fetches all folders and notes, builds a ZIP client-side using JSZip, and triggers a browser download of `{VaultName}.zip`. See [Download Vault](./download-vault.md) for the full flow.
+5. **Delete Vault**: Clicking the Trash2 icon triggers a native `window.confirm()` dialog. On confirm, calls `vaults.remove`.
+6. **Import Vault**: Clicking "Import Vault" opens `ImportVaultDialog`, a modal that guides the user through selecting a local Obsidian vault folder, previewing its contents, and importing all notes, folders, and settings. See [Import Vault](./import-vault.md) for the full flow.
 
 #### State Management
 
@@ -132,9 +133,13 @@ The vault selector is the first screen shown after authentication. It displays a
 
 ### Vault Navigation
 
-- The sidebar header contains a **Vault Switcher** dropdown that lists all vaults. Clicking a different vault dispatches `SET_VAULT` to switch inline. A "Manage Vaults..." option dispatches `LEAVE_VAULT` to return to the full-page vault selector.
-- The command palette also provides a "Manage Vaults" command that dispatches `LEAVE_VAULT`.
+- The sidebar header contains a **Vault Switcher** dropdown that lists all vaults. Clicking a different vault dispatches `SET_VAULT` to switch inline. A "Download Vault" option exports the current vault as a ZIP file. A "Manage Vaults..." option dispatches `LEAVE_VAULT` to return to the full-page vault selector.
+- The command palette provides both a "Download Vault" command (exports the current vault as ZIP) and a "Manage Vaults" command that dispatches `LEAVE_VAULT`.
 - Switching vaults clears all open tabs and panes, resetting the workspace state.
+
+## Download / Export Vault
+
+Users can download any vault as a `.zip` file containing all notes as `.md` files in the vault's folder hierarchy. The ZIP is built entirely client-side using JSZip — no backend changes are needed. See [Download Vault](./download-vault.md) for full details.
 
 ## Ownership & Access Control
 
