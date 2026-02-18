@@ -59,8 +59,6 @@ export default function AppLayout() {
         return <BacklinksPanel />;
       case "search":
         return <SearchPanel />;
-      case "graph":
-        return <GraphView />;
       case "chat":
         return <ChatPanel />;
       default:
@@ -86,8 +84,10 @@ export default function AppLayout() {
           tabs={pane.tabs}
           activeTabId={pane.activeTabId}
         />
-        {activeTab ? (
-          <MarkdownEditor noteId={activeTab.noteId} />
+        {activeTab?.type === "graph" ? (
+          <GraphView />
+        ) : activeTab?.type === "note" ? (
+          <MarkdownEditor noteId={activeTab.noteId!} />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-2">
             <FileText
@@ -128,11 +128,13 @@ export default function AppLayout() {
           <Link2 size={18} />
         </button>
         <button
-          onClick={() =>
-            dispatch({ type: "SET_RIGHT_PANEL", panel: "graph" })
-          }
+          onClick={() => dispatch({ type: "OPEN_GRAPH" })}
           className={`p-1.5 rounded hover:bg-obsidian-bg-tertiary ${
-            state.rightPanel === "graph"
+            (() => {
+              const ap = state.panes.find((p) => p.id === state.activePaneId);
+              const at = ap?.tabs.find((t) => t.id === ap.activeTabId);
+              return at?.type === "graph";
+            })()
               ? "text-obsidian-accent"
               : "text-obsidian-text-muted hover:text-obsidian-text"
           }`}

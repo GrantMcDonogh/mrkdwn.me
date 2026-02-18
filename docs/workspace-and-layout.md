@@ -17,7 +17,7 @@ interface WorkspaceState {
   activePaneId: string;
   splitDirection: "horizontal" | "vertical" | null;
   sidebarOpen: boolean;
-  rightPanel: "backlinks" | "graph" | "search" | "chat" | null;
+  rightPanel: "backlinks" | "search" | "chat" | null;
   searchQuery: string;
 }
 
@@ -29,7 +29,8 @@ interface Pane {
 
 interface Tab {
   id: string;
-  noteId: Id<"notes">;
+  type: "note" | "graph";
+  noteId?: Id<"notes">; // present when type === "note"
 }
 ```
 
@@ -40,20 +41,22 @@ interface Tab {
 | `SET_VAULT` | `vaultId` | Set the active vault; initializes workspace |
 | `LEAVE_VAULT` | — | Clear vault; return to vault selector |
 | `OPEN_NOTE` | `noteId` | Open a note in the active pane (creates tab or activates existing) |
+| `OPEN_GRAPH` | — | Open the graph view as a tab in the active pane (reactivates existing graph tab if present) |
 | `CLOSE_TAB` | `paneId, tabId` | Close a tab in a specific pane |
 | `SET_ACTIVE_TAB` | `paneId, tabId` | Switch active tab in a pane |
 | `SET_ACTIVE_PANE` | `paneId` | Set which pane is focused |
 | `SPLIT_PANE` | `direction` | Split the editor into two panes |
 | `CLOSE_PANE` | `paneId` | Close a pane (returns to single-pane) |
 | `TOGGLE_SIDEBAR` | — | Toggle left sidebar visibility |
-| `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/graph/search/chat) or `null` to close |
+| `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/search/chat) or `null` to close |
 | `SET_SEARCH_QUERY` | `query` | Update the search query string |
 
 ### Reducer Logic
 
 Key behaviors of the state reducer:
 
-- **`OPEN_NOTE`**: If a tab for the note already exists in the active pane, it activates that tab. Otherwise, a new tab is created and activated.
+- **`OPEN_NOTE`**: If a tab for the note already exists in the active pane, it activates that tab. Otherwise, a new tab (with `type: "note"`) is created and activated.
+- **`OPEN_GRAPH`**: If the active pane already has a graph tab, it activates that tab. Otherwise, a new tab (with `type: "graph"`) is created and activated. Only one graph tab per pane.
 - **`CLOSE_TAB`**: Removes the tab. If it was the active tab, the previous tab becomes active. If no tabs remain, `activeTabId` is set to `null`.
 - **`SPLIT_PANE`**: Creates a second pane. Maximum of 2 panes. If already split, this is a no-op.
 - **`CLOSE_PANE`**: Removes the specified pane and reverts to single-pane mode. Tabs from the closed pane are discarded.
@@ -85,12 +88,12 @@ Components access state via:
 │ [≡ Sidebar] [Vault Name]      [Backlinks][Graph][🔍][💬]│
 ├────────┬──────────────────────────────┬───────────────────┤
 │        │ Tab Bar (Pane 1)             │                   │
-│  Side  │ [Tab1] [Tab2] [Tab3]        │  Right Panel      │
+│  Side  │ [Note1] [Note2] [Graph]     │  Right Panel      │
 │  bar   ├──────────────────────────────┤  (Backlinks /     │
-│        │                              │   Graph /         │
-│  File  │ Editor (Pane 1)              │   Search /        │
-│  Expl- │                              │   Chat)           │
-│  orer  │ MarkdownEditor               │                   │
+│        │                              │   Search /        │
+│  File  │ Editor / GraphView (Pane 1)  │   Chat)           │
+│  Expl- │                              │                   │
+│  orer  │                              │                   │
 │        │                              │                   │
 │        ├──────────────────────────────┤                   │
 │        │ Tab Bar (Pane 2) — if split  │                   │
@@ -107,11 +110,11 @@ The toolbar spans the top of the layout and contains:
 | Sidebar toggle button | Left | `TOGGLE_SIDEBAR` |
 | Vault name | Center-left | Display only |
 | Backlinks button | Right | `SET_RIGHT_PANEL("backlinks")` |
-| Graph button | Right | `SET_RIGHT_PANEL("graph")` |
+| Graph button | Right | `OPEN_GRAPH` (opens graph as editor tab) |
 | Search button | Right | `SET_RIGHT_PANEL("search")` |
 | Chat button | Right | `SET_RIGHT_PANEL("chat")` |
 
-Each right-panel button toggles its respective panel. The active panel button is visually highlighted.
+Right-panel buttons toggle their respective panel. The graph button opens a graph tab in the active pane instead. The graph button is highlighted when the active tab is a graph tab; right-panel buttons are highlighted when their panel is open.
 
 ### Keyboard Shortcuts
 
@@ -151,16 +154,17 @@ Registered in `AppLayout`:
 
 ### Functionality
 
-Each pane has its own tab bar displaying the open notes as tabs.
+Each pane has its own tab bar displaying open tabs. Tabs can be either **note tabs** or **graph tabs**.
 
 ### Tab Appearance
 
-| Element | Description |
-|---------|-------------|
-| Tab label | Note title (fetched from note data) |
-| Close button | Lucide `X` icon (size 12), visible on hover via `opacity-0 group-hover:opacity-100` |
-| Active indicator | Background highlight on the active tab |
-| Inactive style | Muted background |
+| Element | Note Tab | Graph Tab |
+|---------|----------|-----------|
+| Icon | — | `GitFork` icon (size 14) |
+| Label | Note title (fetched from note data) | "Graph" (static text) |
+| Close button | Lucide `X` icon (size 12), visible on hover | Same |
+| Active indicator | Background highlight on the active tab | Same |
+| Inactive style | Muted background | Same |
 
 ### Interactions
 
@@ -172,9 +176,10 @@ Each pane has its own tab bar displaying the open notes as tabs.
 
 ### Tab Lifecycle
 
-1. **Open note** (`OPEN_NOTE`): If the note is already open in the active pane, that tab activates. Otherwise, a new tab is appended and activated.
-2. **Close tab** (`CLOSE_TAB`): Tab is removed. If it was active, the previous sibling tab activates; if no previous sibling exists, the first remaining tab activates. If no tabs remain, `activeTabId` is set to `null` and the pane shows an empty state.
-3. **Multiple panes**: Each pane maintains its own independent list of tabs. The same note can be open in tabs across different panes.
+1. **Open note** (`OPEN_NOTE`): If the note is already open in the active pane, that tab activates. Otherwise, a new note tab is appended and activated.
+2. **Open graph** (`OPEN_GRAPH`): If a graph tab already exists in the active pane, it activates. Otherwise, a new graph tab is created. Only one graph tab per pane.
+3. **Close tab** (`CLOSE_TAB`): Tab is removed. If it was active, the previous sibling tab activates; if no previous sibling exists, the first remaining tab activates. If no tabs remain, `activeTabId` is set to `null` and the pane shows an empty state.
+4. **Multiple panes**: Each pane maintains its own independent list of tabs. The same note can be open in tabs across different panes.
 
 ---
 
@@ -230,10 +235,11 @@ The right panel is a collapsible area on the right side of the layout that displ
 | Panel | Component | Description |
 |-------|-----------|-------------|
 | `"backlinks"` | `BacklinksPanel` | Backlinks and unlinked mentions for the active note |
-| `"graph"` | `GraphView` | Force-directed graph of note relationships |
 | `"search"` | `SearchPanel` | Full-text search and tag filtering |
 | `"chat"` | `ChatPanel` | RAG chat powered by Claude AI |
 | `null` | — | Panel hidden |
+
+Note: The graph view is not in the right panel — it opens as a tab in the editor area (see Tab Bar above).
 
 ### Behavior
 

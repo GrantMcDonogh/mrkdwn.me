@@ -34,8 +34,8 @@ export default function CommandPalette({ onClose }: Props) {
       action: () => dispatch({ type: "SET_RIGHT_PANEL", panel: "backlinks" }),
     },
     {
-      name: "Toggle Graph View",
-      action: () => dispatch({ type: "SET_RIGHT_PANEL", panel: "graph" }),
+      name: "Open Graph View",
+      action: () => dispatch({ type: "OPEN_GRAPH" }),
     },
     {
       name: "Toggle Search",

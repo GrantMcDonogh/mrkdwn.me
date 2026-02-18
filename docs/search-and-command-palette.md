@@ -105,7 +105,7 @@ Command Palette Modal
 │   ├── ▸ Split Editor Vertically
 │   ├── ▸ Split Editor Horizontally
 │   ├── ▸ Toggle Backlinks Panel
-│   ├── ▸ Toggle Graph View
+│   ├── ▸ Open Graph View
 │   ├── ▸ Toggle Search
 │   ├── ▸ Toggle Chat
 │   └── ▸ Switch Vault
@@ -120,7 +120,7 @@ Command Palette Modal
 | Split Editor Vertically | Split into vertical panes | `SPLIT_PANE` (vertical) |
 | Split Editor Horizontally | Split into horizontal panes | `SPLIT_PANE` (horizontal) |
 | Toggle Backlinks Panel | Show/hide backlinks in right panel | `{ type: "SET_RIGHT_PANEL", panel: "backlinks" }` |
-| Toggle Graph View | Show/hide graph in right panel | `{ type: "SET_RIGHT_PANEL", panel: "graph" }` |
+| Open Graph View | Open graph as editor tab | `{ type: "OPEN_GRAPH" }` |
 | Toggle Search | Show/hide search in right panel | `{ type: "SET_RIGHT_PANEL", panel: "search" }` |
 | Toggle Chat | Show/hide chat in right panel | `{ type: "SET_RIGHT_PANEL", panel: "chat" }` |
 | Switch Vault | Return to vault selector | `LEAVE_VAULT` |

@@ -27,7 +27,11 @@
       "Bash(git status:*)",
       "Bash(npm test:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npx vercel:*)",
+      "Bash(npm ls:*)",
+      "Bash(python -m base64:*)",
+      "Bash(npx vitest run:*)"
     ]
   }
 }

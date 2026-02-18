@@ -230,10 +230,52 @@ describe("SET_RIGHT_PANEL", () => {
 
   it("toggles off when same panel is set again", () => {
     const s = apply([
-      { type: "SET_RIGHT_PANEL", panel: "graph" },
-      { type: "SET_RIGHT_PANEL", panel: "graph" },
+      { type: "SET_RIGHT_PANEL", panel: "chat" },
+      { type: "SET_RIGHT_PANEL", panel: "chat" },
     ]);
     expect(s.rightPanel).toBeNull();
+  });
+});
+
+// ---------- OPEN_GRAPH ----------
+
+describe("OPEN_GRAPH", () => {
+  it("opens a graph tab in the active pane", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_GRAPH" },
+    ]);
+    const pane = s.panes[0]!;
+    expect(pane.tabs).toHaveLength(1);
+    expect(pane.tabs[0]!.type).toBe("graph");
+    expect(pane.activeTabId).toBe(pane.tabs[0]!.id);
+  });
+
+  it("reactivates existing graph tab instead of duplicating", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+      { type: "OPEN_GRAPH" },
+      { type: "OPEN_NOTE", noteId: noteB },
+      { type: "OPEN_GRAPH" }, // should reactivate existing graph tab
+    ]);
+    const pane = s.panes[0]!;
+    const graphTabs = pane.tabs.filter((t) => t.type === "graph");
+    expect(graphTabs).toHaveLength(1);
+    expect(pane.activeTabId).toBe(graphTabs[0]!.id);
+  });
+
+  it("works alongside note tabs", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+      { type: "OPEN_GRAPH" },
+      { type: "OPEN_NOTE", noteId: noteB },
+    ]);
+    const pane = s.panes[0]!;
+    expect(pane.tabs).toHaveLength(3);
+    expect(pane.tabs.filter((t) => t.type === "note")).toHaveLength(2);
+    expect(pane.tabs.filter((t) => t.type === "graph")).toHaveLength(1);
   });
 });
 

@@ -1,16 +1,22 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
-import { X } from "lucide-react";
+import { X, GitFork } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
+
+interface Tab {
+  id: string;
+  type: "note" | "graph";
+  noteId?: Id<"notes">;
+}
 
 interface Props {
   paneId: string;
-  tabs: { id: string; noteId: Id<"notes"> }[];
+  tabs: Tab[];
   activeTabId: string | null;
 }
 
-function TabItem({
+function NoteTabItem({
   tabId,
   noteId,
   paneId,
@@ -47,20 +53,64 @@ function TabItem({
   );
 }
 
+function GraphTabItem({
+  tabId,
+  paneId,
+  isActive,
+}: {
+  tabId: string;
+  paneId: string;
+  isActive: boolean;
+}) {
+  const [, dispatch] = useWorkspace();
+
+  return (
+    <div
+      className={`flex items-center gap-1 px-3 py-1.5 text-sm cursor-pointer border-r border-obsidian-border select-none max-w-48 group ${
+        isActive
+          ? "bg-obsidian-bg text-obsidian-text"
+          : "bg-obsidian-bg-secondary text-obsidian-text-muted hover:text-obsidian-text"
+      }`}
+      onClick={() => dispatch({ type: "SET_ACTIVE_TAB", paneId, tabId })}
+    >
+      <GitFork size={14} className="shrink-0" />
+      <span className="truncate">Graph</span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          dispatch({ type: "CLOSE_TAB", paneId, tabId });
+        }}
+        className="opacity-0 group-hover:opacity-100 hover:bg-obsidian-bg-tertiary rounded p-0.5 shrink-0"
+      >
+        <X size={12} />
+      </button>
+    </div>
+  );
+}
+
 export default function TabBar({ paneId, tabs, activeTabId }: Props) {
   if (tabs.length === 0) return null;
 
   return (
     <div className="flex bg-obsidian-bg-secondary border-b border-obsidian-border overflow-x-auto shrink-0">
-      {tabs.map((tab) => (
-        <TabItem
-          key={tab.id}
-          tabId={tab.id}
-          noteId={tab.noteId}
-          paneId={paneId}
-          isActive={tab.id === activeTabId}
-        />
-      ))}
+      {tabs.map((tab) =>
+        tab.type === "graph" ? (
+          <GraphTabItem
+            key={tab.id}
+            tabId={tab.id}
+            paneId={paneId}
+            isActive={tab.id === activeTabId}
+          />
+        ) : (
+          <NoteTabItem
+            key={tab.id}
+            tabId={tab.id}
+            noteId={tab.noteId!}
+            paneId={paneId}
+            isActive={tab.id === activeTabId}
+          />
+        )
+      )}
     </div>
   );
 }

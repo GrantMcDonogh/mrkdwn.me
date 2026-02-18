@@ -11,7 +11,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 interface Tab {
   id: string;
-  noteId: Id<"notes">;
+  type: "note" | "graph";
+  noteId?: Id<"notes">; // present when type === "note"
 }
 
 interface Pane {
@@ -26,7 +27,7 @@ export interface WorkspaceState {
   activePaneId: string;
   splitDirection: "horizontal" | "vertical" | null;
   sidebarOpen: boolean;
-  rightPanel: "backlinks" | "graph" | "search" | "chat" | null;
+  rightPanel: "backlinks" | "search" | "chat" | null;
   searchQuery: string;
 }
 
@@ -34,6 +35,7 @@ export type Action =
   | { type: "SET_VAULT"; vaultId: Id<"vaults"> }
   | { type: "LEAVE_VAULT" }
   | { type: "OPEN_NOTE"; noteId: Id<"notes"> }
+  | { type: "OPEN_GRAPH" }
   | { type: "CLOSE_TAB"; paneId: string; tabId: string }
   | { type: "SET_ACTIVE_TAB"; paneId: string; tabId: string }
   | { type: "SET_ACTIVE_PANE"; paneId: string }
@@ -84,7 +86,9 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       );
       if (paneIdx === -1) return state;
       const pane = state.panes[paneIdx]!;
-      const existingTab = pane.tabs.find((t) => t.noteId === action.noteId);
+      const existingTab = pane.tabs.find(
+        (t) => t.type === "note" && t.noteId === action.noteId
+      );
       if (existingTab) {
         const updatedPane = { ...pane, activeTabId: existingTab.id };
         const panes = [...state.panes];
@@ -93,7 +97,35 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       }
       const newTab: Tab = {
         id: `tab-${++tabCounter}`,
+        type: "note",
         noteId: action.noteId,
+      };
+      const updatedPane = {
+        ...pane,
+        tabs: [...pane.tabs, newTab],
+        activeTabId: newTab.id,
+      };
+      const panes = [...state.panes];
+      panes[paneIdx] = updatedPane;
+      return { ...state, panes };
+    }
+
+    case "OPEN_GRAPH": {
+      const paneIdx = state.panes.findIndex(
+        (p) => p.id === state.activePaneId
+      );
+      if (paneIdx === -1) return state;
+      const pane = state.panes[paneIdx]!;
+      const existingTab = pane.tabs.find((t) => t.type === "graph");
+      if (existingTab) {
+        const updatedPane = { ...pane, activeTabId: existingTab.id };
+        const panes = [...state.panes];
+        panes[paneIdx] = updatedPane;
+        return { ...state, panes };
+      }
+      const newTab: Tab = {
+        id: `tab-${++tabCounter}`,
+        type: "graph",
       };
       const updatedPane = {
         ...pane,

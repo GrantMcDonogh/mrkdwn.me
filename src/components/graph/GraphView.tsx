@@ -189,14 +189,5 @@ export default function GraphView() {
     };
   }, [graphData, activeNoteId, dispatch]);
 
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2 border-b border-obsidian-border">
-        <span className="text-xs font-semibold uppercase text-obsidian-text-muted">
-          Graph View
-        </span>
-      </div>
-      <svg ref={svgRef} className="w-full h-[calc(100%-33px)]" />
-    </div>
-  );
+  return <svg ref={svgRef} className="w-full h-full" />;
 }
