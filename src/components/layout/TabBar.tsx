@@ -1,8 +1,9 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
-import { X, GitFork, Eye, Pencil } from "lucide-react";
+import { X, GitFork, Eye, Pencil, FileDown } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { useExportNotePDF } from "../../hooks/useExportNotePDF";
 
 interface Tab {
   id: string;
@@ -32,6 +33,7 @@ function NoteTabItem({
 }) {
   const [, dispatch] = useWorkspace();
   const note = useQuery(api.notes.get, { id: noteId });
+  const exportPDF = useExportNotePDF();
   const ModeIcon = mode === "edit" ? Pencil : Eye;
 
   return (
@@ -53,6 +55,16 @@ function NoteTabItem({
         title={mode === "edit" ? "Switch to preview" : "Switch to edit"}
       >
         <ModeIcon size={12} />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          exportPDF(noteId);
+        }}
+        className="opacity-0 group-hover:opacity-100 hover:bg-obsidian-bg-tertiary rounded p-0.5 shrink-0"
+        title="Export as PDF"
+      >
+        <FileDown size={12} />
       </button>
       <button
         onClick={(e) => {

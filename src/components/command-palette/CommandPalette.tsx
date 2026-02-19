@@ -3,6 +3,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
 import { useDownloadVault } from "../../hooks/useDownloadVault";
+import { useExportNotePDF } from "../../hooks/useExportNotePDF";
 
 interface Command {
   name: string;
@@ -20,6 +21,7 @@ export default function CommandPalette({ onClose }: Props) {
     state.vaultId ? { id: state.vaultId } : "skip"
   );
   const downloadVault = useDownloadVault();
+  const exportPDF = useExportNotePDF();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,6 +85,23 @@ export default function CommandPalette({ onClose }: Props) {
         }
       },
     },
+    ...(() => {
+      const activePane = state.panes.find(
+        (p) => p.id === state.activePaneId
+      );
+      const activeTab = activePane?.tabs.find(
+        (t) => t.id === activePane.activeTabId
+      );
+      if (activeTab?.type === "note" && activeTab.noteId) {
+        return [
+          {
+            name: "Export Note to PDF",
+            action: () => exportPDF(activeTab.noteId!),
+          },
+        ];
+      }
+      return [];
+    })(),
   ];
 
   const filtered = commands.filter((c) =>
