@@ -9,12 +9,15 @@
  */
 
 import type * as chat from "../chat.js";
+import type * as chatEdit from "../chatEdit.js";
+import type * as chatEditHelpers from "../chatEditHelpers.js";
 import type * as chatHelpers from "../chatHelpers.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
 import type * as importVault from "../importVault.js";
 import type * as notes from "../notes.js";
 import type * as onboarding from "../onboarding.js";
+import type * as userSettings from "../userSettings.js";
 import type * as vaults from "../vaults.js";
 
 import type {
@@ -25,12 +28,15 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   chat: typeof chat;
+  chatEdit: typeof chatEdit;
+  chatEditHelpers: typeof chatEditHelpers;
   chatHelpers: typeof chatHelpers;
   folders: typeof folders;
   http: typeof http;
   importVault: typeof importVault;
   notes: typeof notes;
   onboarding: typeof onboarding;
+  userSettings: typeof userSettings;
   vaults: typeof vaults;
 }>;
 
