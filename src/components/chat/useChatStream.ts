@@ -1,9 +1,16 @@
 import { useState, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { parseEditBlocks, type EditBlock } from "../../lib/parseEditBlocks";
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  editBlocks?: EditBlock[];
+}
+
+interface SendOptions {
+  activeNoteId?: string;
+  useEditEndpoint?: boolean;
 }
 
 export function useChatStream() {
@@ -13,7 +20,7 @@ export function useChatStream() {
   const abortRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
-    async (vaultId: string, message: string) => {
+    async (vaultId: string, message: string, options?: SendOptions) => {
       if (isStreaming) return;
 
       // Add user message
@@ -32,13 +39,22 @@ export function useChatStream() {
 
         abortRef.current = new AbortController();
 
-        const response = await fetch(`${siteUrl}/api/chat`, {
+        const endpoint = options?.useEditEndpoint
+          ? `${siteUrl}/api/chat-edit`
+          : `${siteUrl}/api/chat`;
+
+        const body: Record<string, unknown> = { vaultId, message };
+        if (options?.useEditEndpoint && options.activeNoteId) {
+          body.activeNoteId = options.activeNoteId;
+        }
+
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ vaultId, message }),
+          body: JSON.stringify(body),
           signal: abortRef.current.signal,
         });
 
@@ -74,6 +90,19 @@ export function useChatStream() {
             return updated;
           });
         }
+
+        // After streaming completes, parse edit blocks if using edit endpoint
+        if (options?.useEditEndpoint) {
+          setMessages((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1]!;
+            const blocks = parseEditBlocks(last.content);
+            if (blocks.length > 0) {
+              updated[updated.length - 1] = { ...last, editBlocks: blocks };
+            }
+            return updated;
+          });
+        }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
           setMessages((prev) => {
@@ -93,9 +122,24 @@ export function useChatStream() {
     [getToken, isStreaming]
   );
 
+  const updateBlockStatus = useCallback(
+    (messageIndex: number, blockIndex: number, status: "applied" | "dismissed") => {
+      setMessages((prev) => {
+        const updated = [...prev];
+        const msg = updated[messageIndex];
+        if (!msg?.editBlocks) return prev;
+        const newBlocks = [...msg.editBlocks];
+        newBlocks[blockIndex] = { ...newBlocks[blockIndex]!, status };
+        updated[messageIndex] = { ...msg, editBlocks: newBlocks };
+        return updated;
+      });
+    },
+    []
+  );
+
   const clearMessages = useCallback(() => {
     setMessages([]);
   }, []);
 
-  return { messages, isStreaming, sendMessage, clearMessages };
+  return { messages, isStreaming, sendMessage, clearMessages, updateBlockStatus };
 }

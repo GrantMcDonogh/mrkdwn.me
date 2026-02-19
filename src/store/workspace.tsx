@@ -249,3 +249,11 @@ export function useWorkspace() {
   if (!ctx) throw new Error("useWorkspace must be used within WorkspaceProvider");
   return ctx;
 }
+
+export function getActiveNoteId(state: WorkspaceState): Id<"notes"> | null {
+  const pane = state.panes.find((p) => p.id === state.activePaneId);
+  if (!pane) return null;
+  const tab = pane.tabs.find((t) => t.id === pane.activeTabId);
+  if (!tab || tab.type !== "note") return null;
+  return tab.noteId ?? null;
+}

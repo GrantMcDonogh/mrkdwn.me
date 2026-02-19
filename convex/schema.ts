@@ -37,4 +37,8 @@ export default defineSchema({
       searchField: "title",
       filterFields: ["vaultId"],
     }),
+  userSettings: defineTable({
+    userId: v.string(),
+    openRouterKey: v.optional(v.string()),
+  }).index("by_user", ["userId"]),
 });

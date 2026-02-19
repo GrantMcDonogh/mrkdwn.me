@@ -12,9 +12,10 @@ interface Command {
 
 interface Props {
   onClose: () => void;
+  onOpenSettings?: () => void;
 }
 
-export default function CommandPalette({ onClose }: Props) {
+export default function CommandPalette({ onClose, onOpenSettings }: Props) {
   const [state, dispatch] = useWorkspace();
   const currentVault = useQuery(
     api.vaults.get,
@@ -59,6 +60,9 @@ export default function CommandPalette({ onClose }: Props) {
       name: "Manage Vaults",
       action: () => dispatch({ type: "LEAVE_VAULT" }),
     },
+    ...(onOpenSettings
+      ? [{ name: "Open Settings", action: () => onOpenSettings() }]
+      : []),
     ...(state.vaultId && currentVault
       ? [
           {

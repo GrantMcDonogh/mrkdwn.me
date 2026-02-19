@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reducer, initialState, type Action } from "./workspace";
+import { reducer, initialState, getActiveNoteId, type Action } from "./workspace";
 import type { WorkspaceState } from "./workspace";
 import type { Id } from "../../convex/_generated/dataModel";
 
@@ -288,5 +288,84 @@ describe("SET_SEARCH_QUERY", () => {
       query: "hello",
     });
     expect(s.searchQuery).toBe("hello");
+  });
+});
+
+// ---------- getActiveNoteId ----------
+
+describe("getActiveNoteId", () => {
+  it("returns null when no tabs are open", () => {
+    const s = apply([{ type: "SET_VAULT", vaultId }]);
+    expect(getActiveNoteId(s)).toBeNull();
+  });
+
+  it("returns the note id of the active tab", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+    ]);
+    expect(getActiveNoteId(s)).toBe(noteA);
+  });
+
+  it("returns the most recently opened note when multiple tabs exist", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+      { type: "OPEN_NOTE", noteId: noteB },
+    ]);
+    expect(getActiveNoteId(s)).toBe(noteB);
+  });
+
+  it("follows SET_ACTIVE_TAB to return the correct note", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+      { type: "OPEN_NOTE", noteId: noteB },
+    ]);
+    const pane = s.panes[0]!;
+    const tabA = pane.tabs[0]!;
+    const switched = reducer(s, {
+      type: "SET_ACTIVE_TAB",
+      paneId: pane.id,
+      tabId: tabA.id,
+    });
+    expect(getActiveNoteId(switched)).toBe(noteA);
+  });
+
+  it("returns null when the active tab is a graph tab", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_GRAPH" },
+    ]);
+    expect(getActiveNoteId(s)).toBeNull();
+  });
+
+  it("returns null after closing the last tab", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+    ]);
+    const pane = s.panes[0]!;
+    const closed = reducer(s, {
+      type: "CLOSE_TAB",
+      paneId: pane.id,
+      tabId: pane.tabs[0]!.id,
+    });
+    expect(getActiveNoteId(closed)).toBeNull();
+  });
+
+  it("returns note id from the active pane in a split layout", () => {
+    const s = apply([
+      { type: "SET_VAULT", vaultId },
+      { type: "OPEN_NOTE", noteId: noteA },
+      { type: "SPLIT_PANE", direction: "horizontal" },
+      { type: "SET_ACTIVE_PANE", paneId: "pane-2" },
+      { type: "OPEN_NOTE", noteId: noteB },
+    ]);
+    expect(getActiveNoteId(s)).toBe(noteB);
+  });
+
+  it("returns null on initial state", () => {
+    expect(getActiveNoteId(initialState)).toBeNull();
   });
 });

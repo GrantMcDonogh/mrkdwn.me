@@ -12,6 +12,7 @@ import ChatPanel from "../chat/ChatPanel";
 import SplitPane from "./SplitPane";
 import CommandPalette from "../command-palette/CommandPalette";
 import QuickSwitcher from "../command-palette/QuickSwitcher";
+import SettingsDialog from "../settings/SettingsDialog";
 import {
   PanelLeft,
   Link2,
@@ -19,6 +20,7 @@ import {
   Search,
   FileText,
   MessageSquare,
+  Settings,
 } from "lucide-react";
 
 export default function AppLayout() {
@@ -29,6 +31,7 @@ export default function AppLayout() {
   );
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -186,6 +189,13 @@ export default function AppLayout() {
         >
           <MessageSquare size={18} />
         </button>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-1.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
+          title="Settings"
+        >
+          <Settings size={18} />
+        </button>
       </div>
 
       {/* Content */}
@@ -213,10 +223,19 @@ export default function AppLayout() {
 
       {/* Modals */}
       {showCommandPalette && (
-        <CommandPalette onClose={() => setShowCommandPalette(false)} />
+        <CommandPalette
+          onClose={() => setShowCommandPalette(false)}
+          onOpenSettings={() => {
+            setShowCommandPalette(false);
+            setShowSettings(true);
+          }}
+        />
       )}
       {showQuickSwitcher && (
         <QuickSwitcher onClose={() => setShowQuickSwitcher(false)} />
+      )}
+      {showSettings && (
+        <SettingsDialog onClose={() => setShowSettings(false)} />
       )}
     </div>
   );

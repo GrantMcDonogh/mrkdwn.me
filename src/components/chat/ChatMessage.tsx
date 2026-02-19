@@ -1,11 +1,27 @@
 import { User, Bot } from "lucide-react";
+import type { EditBlock } from "../../lib/parseEditBlocks";
+import { stripEditBlocks } from "../../lib/parseEditBlocks";
+import EditBlockCard from "./EditBlockCard";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface Props {
   role: "user" | "assistant";
   content: string;
+  editBlocks?: EditBlock[];
+  vaultId?: Id<"vaults">;
+  onBlockStatusChange?: (blockIndex: number, status: "applied" | "dismissed") => void;
 }
 
-export default function ChatMessage({ role, content }: Props) {
+export default function ChatMessage({
+  role,
+  content,
+  editBlocks,
+  vaultId,
+  onBlockStatusChange,
+}: Props) {
+  const displayContent =
+    editBlocks && editBlocks.length > 0 ? stripEditBlocks(content) : content;
+
   return (
     <div
       className={`flex gap-2 p-3 ${
@@ -28,12 +44,22 @@ export default function ChatMessage({ role, content }: Props) {
           {role === "user" ? "You" : "Assistant"}
         </p>
         <div className="text-sm text-obsidian-text whitespace-pre-wrap break-words">
-          {content || (
+          {displayContent || (
             <span className="text-obsidian-text-muted animate-pulse">
               Thinking...
             </span>
           )}
         </div>
+        {editBlocks &&
+          vaultId &&
+          editBlocks.map((block, i) => (
+            <EditBlockCard
+              key={i}
+              block={block}
+              vaultId={vaultId}
+              onStatusChange={(status) => onBlockStatusChange?.(i, status)}
+            />
+          ))}
       </div>
     </div>
   );
