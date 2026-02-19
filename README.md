@@ -13,7 +13,8 @@ A cloud-based knowledge management app inspired by [Obsidian](https://obsidian.m
 - **Split panes & tabs** — Open multiple notes side-by-side
 - **File explorer** — Hierarchical folder tree with drag-and-drop
 - **AI chat** — Ask questions about your vault, powered by Claude with RAG context
-- **Vault import/export** — Import from Obsidian (ZIP) and export your vault as ZIP
+- **Vault import/export** — Import from Obsidian (ZIP), upload `.md` files into existing vaults, and export your vault as ZIP
+- **PDF export** — Export individual notes as styled PDF documents
 - **AI onboarding** — Guided wizard to generate a starter vault
 - **MCP server** — Model Context Protocol server for AI tool integrations
 - **Real-time sync** — All changes sync instantly via Convex subscriptions
@@ -145,8 +146,8 @@ Detailed docs for each feature are in the [`docs/`](./docs) directory:
 - [Database & API](./docs/database-and-api.md)
 - [Real-Time & Sync](./docs/real-time-and-sync.md)
 - [AI Chat (RAG)](./docs/rag-chat.md)
-- [Import Vault](./docs/import-vault.md)
-- [Download / Export Vault](./docs/download-vault.md)
+- [Import Vault & Upload](./docs/import-vault.md)
+- [Download, Export & PDF](./docs/download-vault.md)
 - [Design & Styling](./docs/design-and-styling.md)
 - [MCP Server](./docs/mcp-server.md)
 

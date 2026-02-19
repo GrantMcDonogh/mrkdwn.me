@@ -93,6 +93,86 @@ Creates a vault document without client-facing auth (called from the `importVaul
 - **Parameters**: `{ name: string, userId: string, settings?: any }`
 - **Returns**: `Id<"vaults">`
 
+## AI Onboarding Wizard
+
+Users can generate a personalized starter vault via a guided AI wizard.
+
+### Entry Point
+
+A "Set Up with AI" button with a `Sparkles` icon appears in the `VaultSelector`, alongside "Create New Vault" and "Import Vault". Clicking it opens the `OnboardingWizardDialog`.
+
+### Wizard Flow
+
+**File:** `src/components/vault/OnboardingWizardDialog.tsx`
+
+The dialog is a state machine with the following states:
+
+| State | UI |
+|---|---|
+| `questions` | Chat-like interface — bot asks questions, user selects options |
+| `generating` | Spinner + "Generating your personalized vault…" |
+| `preview` | Editable vault name, folder/note counts, "Create Vault" button |
+| `creating` | Progress spinner ("Creating vault and folders…" → "Creating notes (batch N of M)…") |
+| `done` | Checkmark + auto-navigates to new vault after 1 second |
+| `error` | Error message + "Try Again" button (resets to `questions`) |
+
+### Questions
+
+**File:** `src/lib/onboardingQuestions.ts`
+
+| # | Question | Type | Options |
+|---|----------|------|---------|
+| 1 | Purpose | Single-select | Personal knowledge, Work, Academic/Research, Creative/Projects, General second brain |
+| 2 | Topics | Multi-select (max 3) | Technology, Business, Science, Arts, Self-improvement, Mixed |
+| 3 | Organization | Single-select | By topic, By project, Flat with links, Chronological |
+| 4 | Starter Content | Single-select | Templates & examples, Pre-filled notes, Empty structure only, Full starter kit |
+
+### Backend
+
+**File:** `convex/onboarding.ts`
+
+An HTTP action that calls the Claude API (`claude-sonnet-4-5-20250929`, max 8192 tokens) with a system prompt that instructs Claude to generate a vault structure (3–8 folders, 5–15 notes with `[[Wiki Link]]` syntax) as JSON.
+
+**File:** `convex/http.ts` — registers `POST /api/onboarding` and `OPTIONS /api/onboarding` routes.
+
+### Client Hook
+
+**File:** `src/hooks/useOnboardingGenerate.ts`
+
+Returns a `generate(answers)` function that calls the `/api/onboarding` endpoint with the user's answers and Clerk auth token. Returns a `GeneratedVault` object (`{ vaultName, folders, notes }`).
+
+### Vault Creation
+
+After generation, the wizard reuses the same import infrastructure:
+1. Calls `createVaultWithFolders` action (creates vault + all folders server-side)
+2. Maps temporary folder IDs to real database IDs
+3. Uses `batchNotes()` to split notes into size-limited batches
+4. Calls `notes.importBatch` mutation for each batch
+
+### Response Parsing
+
+**File:** `src/lib/onboardingParse.ts`
+
+Utilities for extracting and validating the Claude API response:
+- Strips markdown code fencing from responses
+- Validates JSON structure (requires `vaultName`, `folders` array, `notes` array)
+
+### Tests
+
+**Files:** `src/lib/onboardingParse.test.ts` (36 tests), `src/lib/onboardingQuestions.test.ts` (12 tests)
+
+### File Summary
+
+| File | Purpose |
+|---|---|
+| `src/components/vault/OnboardingWizardDialog.tsx` | Wizard dialog UI (state machine) |
+| `src/hooks/useOnboardingGenerate.ts` | Client hook for AI generation |
+| `src/lib/onboardingQuestions.ts` | Question definitions |
+| `src/lib/onboardingParse.ts` | Response parsing utilities |
+| `convex/onboarding.ts` | Backend HTTP action (Claude API) |
+| `convex/http.ts` | Route registration |
+| `src/components/vault/VaultSelector.tsx` | Entry point button |
+
 ## Import Vault
 
 Users can import existing Obsidian vaults from their local filesystem. The import flow reads all `.md` files and folder structure, parses applicable `.obsidian` settings, and creates everything in the database. See [Import Vault](./import-vault.md) for full details.
@@ -113,6 +193,7 @@ The vault selector is the first screen shown after authentication. It displays a
 | Vault List | Vertical stack of vault cards, each showing the vault name with hover-reveal action buttons (Pencil for rename, Download for export as ZIP, Trash2 for delete) |
 | Create Button | Full-width dashed-border card with `Plus` icon and "Create New Vault" text |
 | Import Button | Full-width dashed-border card with `Upload` icon and "Import Vault" text. Opens the Import Vault dialog. |
+| AI Onboarding Button | Full-width dashed-border card with `Sparkles` icon and "Set Up with AI" text. Opens the AI Onboarding Wizard dialog. |
 | Create Form | Inline form with text input, "Create" submit button, and "Cancel" button |
 | Empty State | "No vaults yet. Create one to get started." message (shown when no vaults exist) |
 
@@ -124,6 +205,7 @@ The vault selector is the first screen shown after authentication. It displays a
 4. **Download Vault**: Clicking the Download icon fetches all folders and notes, builds a ZIP client-side using JSZip, and triggers a browser download of `{VaultName}.zip`. See [Download Vault](./download-vault.md) for the full flow.
 5. **Delete Vault**: Clicking the Trash2 icon triggers a native `window.confirm()` dialog. On confirm, calls `vaults.remove`.
 6. **Import Vault**: Clicking "Import Vault" opens `ImportVaultDialog`, a modal that guides the user through selecting a local Obsidian vault folder, previewing its contents, and importing all notes, folders, and settings. See [Import Vault](./import-vault.md) for the full flow.
+7. **AI Onboarding**: Clicking "Set Up with AI" opens the `OnboardingWizardDialog`, a multi-step wizard that asks about the user's knowledge management goals and generates a personalized starter vault using Claude. See the AI Onboarding Wizard section above.
 
 #### State Management
 

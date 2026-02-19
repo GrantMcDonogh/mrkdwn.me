@@ -1,8 +1,11 @@
-# Download Vault
+# Download & Export
 
 ## Overview
 
-The Download Vault feature allows users to export an entire vault as a `.zip` file containing all notes as `.md` files organized in the vault's folder hierarchy. The ZIP is built entirely client-side using JSZip — no backend changes are needed.
+mrkdwn.me provides two export mechanisms:
+
+1. **Download Vault** — Export an entire vault as a `.zip` file containing all notes as `.md` files organized in the vault's folder hierarchy. Built client-side using JSZip.
+2. **Export Note to PDF** — Export a single note as a styled PDF document. Built client-side using html2pdf.js and marked.
 
 ## Data Flow
 
@@ -155,13 +158,89 @@ TODO.md
 
 ---
 
+## PDF Export (Single Note)
+
+### Overview
+
+Users can export any individual note as a styled PDF document. The entire process runs client-side — no backend changes are needed.
+
+### Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `html2pdf.js` | Client-side PDF generation from HTML |
+| `marked` | Markdown → HTML conversion |
+
+### Data Flow
+
+```
+User clicks "Export to PDF"
+        │
+        ▼
+  ┌────────────────────┐
+  │ useExportNotePDF() │  Hook: fetches note via useConvex()
+  └──────────┬─────────┘
+             │ { title, content }
+             ▼
+  ┌────────────────────┐
+  │ exportNoteToPDF()  │  Utility: preprocess markdown,
+  │                    │  convert to HTML, generate PDF
+  └──────────┬─────────┘
+             │ PDF Blob
+             ▼
+   Browser download
+   ({title}.pdf)
+```
+
+### Core Utility
+
+**File:** `src/utils/exportNoteToPDF.ts`
+
+#### `exportNoteToPDF(title, content)`
+
+1. **Preprocesses** markdown via `preprocessForPDF()`:
+   - Preserves code blocks and inline code
+   - Converts wiki links: `[[Title|Alias]]` → `Alias`, `[[Title]]` → `Title`
+   - Strips hashtags (not headings): `#tag` → `tag`
+
+2. **Converts** markdown to HTML using `marked.parse()`
+
+3. **Wraps** in a styled HTML container:
+   - Georgia serif font, 24px title with bottom border
+   - Custom table styling (collapsed borders, alternating row colors)
+   - Code block styling (light gray background, monospace font)
+   - Blockquote styling (left border, indentation)
+
+4. **Generates** PDF via html2pdf.js:
+   - A4 portrait, 15mm margins
+   - 2x canvas scale for quality
+   - Filename: sanitized title (special characters → underscores)
+
+### Hook
+
+**File:** `src/hooks/useExportNotePDF.ts`
+
+Returns an async `exportPDF(noteId)` function that fetches the note from Convex and calls `exportNoteToPDF()`.
+
+### Frontend Integration
+
+| Location | File | UI |
+|----------|------|----|
+| Tab bar | `src/components/layout/TabBar.tsx` | `FileDown` icon button on each tab (visible on hover) |
+| Command palette | `src/components/command-palette/CommandPalette.tsx` | "Export Note to PDF" command (available when a note is open) |
+
+---
+
 ## File Summary
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `package.json` | Modified | Added `jszip` dependency |
+| `package.json` | Modified | Added `jszip`, `html2pdf.js`, `marked` dependencies |
 | `src/utils/downloadVault.ts` | Created | ZIP building + browser download utility |
-| `src/hooks/useDownloadVault.ts` | Created | Hook wrapping Convex fetch + download |
+| `src/utils/exportNoteToPDF.ts` | Created | Single-note PDF export utility |
+| `src/hooks/useDownloadVault.ts` | Created | Hook wrapping Convex fetch + vault download |
+| `src/hooks/useExportNotePDF.ts` | Created | Hook wrapping Convex fetch + note PDF export |
 | `src/components/vault/VaultSelector.tsx` | Modified | Added download button per vault |
 | `src/components/layout/Sidebar.tsx` | Modified | Added "Download Vault" to VaultSwitcher dropdown |
-| `src/components/command-palette/CommandPalette.tsx` | Modified | Added "Download Vault" command |
+| `src/components/layout/TabBar.tsx` | Modified | Added "Export to PDF" button per tab |
+| `src/components/command-palette/CommandPalette.tsx` | Modified | Added "Download Vault" and "Export Note to PDF" commands |

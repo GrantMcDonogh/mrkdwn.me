@@ -112,10 +112,12 @@ The component receives flat lists of folders and notes from Convex queries, then
 
 ```
 File Explorer Panel
-├── Header: "Explorer" label + action buttons
+├── Hidden <input type="file" multiple accept=".md">
+├── Header: "Explorer" label (or "Uploading…" spinner) + action buttons
 │   ├── [+] Create Note (at root)
-│   └── [📁+] Create Folder (at root)
-├── Tree View (scrollable)
+│   ├── [📁+] Create Folder (at root)
+│   └── [⬆] Upload .md Files (at root)
+├── Tree View (scrollable, drop zone for external files)
 │   ├── 📁 Folder A (clickable to expand/collapse)
 │   │   ├── 📄 Note 1 (clickable to open)
 │   │   ├── 📄 Note 2
@@ -134,10 +136,12 @@ File Explorer Panel
 | **Open Note** | Click note row | Dispatches `OPEN_NOTE` to workspace context |
 | **Create Note** | Click `+` (Plus) button on header or folder hover | Opens inline creation form with default name "Untitled". On Enter or blur, calls `notes.create`, then auto-opens the new note via `OPEN_NOTE`. If inside a folder, auto-expands it. |
 | **Create Folder** | Click `FolderPlus` button on header or folder hover | Opens inline creation form with default name "New Folder". On Enter or blur, calls `folders.create`. If inside a folder, auto-expands it. |
+| **Upload .md Files** | Click `Upload` button on header or folder hover | Opens native file picker (`.md` only, multi-select). Filters to `.md` files, reads content, batches via `batchNotes()`, and calls `notes.importBatch` for each batch. Header shows "Uploading…" spinner during upload. When triggered from a folder's hover button, notes are created inside that folder; from the header, notes go to the vault root. |
 | **Rename** | Double-click item name | Switches to inline edit mode; save on Enter or blur. Escape cancels. |
 | **Delete Note** | Click `Trash2` icon (visible on hover) | Calls `notes.remove` mutation |
 | **Delete Folder** | Click `Trash2` icon (visible on hover) | Calls `folders.remove` mutation; children promoted |
 | **Move (Drag & Drop)** | Drag item onto a folder or root area | Calls `notes.move({ id, folderId })` or `folders.move({ id, parentId })`. Dropping on empty space moves to root. |
+| **Upload via Drag & Drop** | Drag `.md` files from OS file manager onto the explorer | Detects external file drops (checks `e.dataTransfer.files`), filters to `.md` files, and uploads them via `prepareUploadNotes()` + `batchNotes()` + `notes.importBatch`. Dropping onto a folder uploads into that folder; dropping on the root area uploads to the vault root. Non-`.md` files are silently ignored. |
 
 ### Inline Editing
 
@@ -156,9 +160,22 @@ When renaming a folder or note:
 - **`creatingIn`**: `{ parentId: Id<"folders"> | undefined; type: "folder" | "note" } | null` — tracks both the parent folder and type when creating a new item via the inline form.
 - **`newItemName`**: The text being typed in the inline creation input.
 - **`dragOverId`**: `string | null` — tracks which folder (or `"root"`) is currently being dragged over, used for visual drop-target highlighting.
+- **`uploading`**: `boolean` — true while `.md` files are being uploaded; toggles the header between "Explorer" label and "Uploading…" spinner.
+- **`fileInputRef`**: `React.RefObject<HTMLInputElement>` — ref to the hidden file input, triggered programmatically by the upload buttons.
+- **`uploadTargetRef`**: `React.MutableRefObject<Id<"folders"> | undefined>` — stores the target folder for the current upload (set before opening the file picker).
 
 ### Drag & Drop
 
+The `handleDrop` function handles two types of drops:
+
+**External file drops (from OS file manager):**
+- Detected by checking `e.dataTransfer.files.length > 0` first.
+- If any dropped files have a `.md` extension, `handleUploadFiles()` is called with the files and the target folder ID.
+- Files are processed via `prepareUploadNotes()` (filters to `.md`, reads content, derives titles), batched via `batchNotes()`, and uploaded via `notes.importBatch`.
+- Non-`.md` files in the drop are silently ignored.
+
+**Internal drag-and-drop (reordering notes/folders):**
+- Falls through to the existing logic if no external files are detected.
 - Items can be dragged and dropped onto folders or the root area to reorganize the tree.
 - Drop targets are visually indicated with a `bg-obsidian-bg-tertiary` highlight (tracked via `dragOverId` state).
 - Dropping a note onto a folder calls `notes.move({ id, folderId })`.
@@ -170,6 +187,6 @@ When renaming a folder or note:
 - Indentation per nesting level (left padding increases with depth).
 - Folder icons: `ChevronRight` (collapsed) / `ChevronDown` (expanded) + `Folder` / `FolderOpen`.
 - Note icons: `FileText` from lucide-react.
-- Hover state reveals action buttons: `Plus` + `FolderPlus` + `Trash2` for folders, `Trash2` only for notes. Rename is triggered by double-click, not a hover button.
+- Hover state reveals action buttons: `Plus` + `FolderPlus` + `Upload` + `Trash2` for folders, `Trash2` only for notes. Rename is triggered by double-click, not a hover button.
 - Active/selected note is highlighted with `bg-obsidian-bg-tertiary`.
 - Text truncation with ellipsis for long names.

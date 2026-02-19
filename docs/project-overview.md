@@ -185,6 +185,7 @@ npm run lint
 | Database & API | [database-and-api.md](./database-and-api.md) |
 | Real-Time & Sync | [real-time-and-sync.md](./real-time-and-sync.md) |
 | AI Chat (RAG) | [rag-chat.md](./rag-chat.md) |
-| Download / Export Vault | [download-vault.md](./download-vault.md) |
+| Import Vault & Upload | [import-vault.md](./import-vault.md) |
+| Download, Export & PDF | [download-vault.md](./download-vault.md) |
 | Design & Styling | [design-and-styling.md](./design-and-styling.md) |
 | MCP Server | [mcp-server.md](./mcp-server.md) |
