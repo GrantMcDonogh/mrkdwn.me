@@ -1,5 +1,6 @@
 import { internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 
 export const buildEditContext = internalQuery({
   args: {
@@ -17,7 +18,7 @@ export const buildEditContext = internalQuery({
     let activeNoteTitle: string | null = null;
     if (args.activeNoteId) {
       try {
-        const activeNote = await ctx.db.get(args.activeNoteId as any);
+        const activeNote = await ctx.db.get(args.activeNoteId as Id<"notes">);
         if (activeNote) {
           activeNoteTitle = activeNote.title;
           const block =
