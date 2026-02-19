@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState, useRef, type KeyboardEvent } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
@@ -11,8 +11,11 @@ import {
   Plus,
   FolderPlus,
   Trash2,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { batchNotes, prepareUploadNotes } from "../../lib/importVault";
 
 export default function FileExplorer() {
   const [state, dispatch] = useWorkspace();
@@ -37,6 +40,10 @@ export default function FileExplorer() {
   } | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadTargetRef = useRef<Id<"folders"> | undefined>(undefined);
+  const importBatch = useMutation(api.notes.importBatch);
 
   // Get active note id from active pane's active tab
   const activePane = state.panes.find((p) => p.id === state.activePaneId);
@@ -127,6 +134,39 @@ export default function FileExplorer() {
     setDragOverId(null);
   }
 
+  async function handleUploadFiles(
+    files: FileList,
+    targetFolderId?: Id<"folders">
+  ) {
+    const { notes: prepared, folderIdMap } = await prepareUploadNotes(
+      files,
+      targetFolderId
+    );
+    if (prepared.length === 0) return;
+
+    setUploading(true);
+    try {
+      const batches = batchNotes(prepared, folderIdMap, vaultId);
+      for (const batch of batches) {
+        await importBatch({ notes: batch });
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      handleUploadFiles(e.target.files, uploadTargetRef.current);
+    }
+    e.target.value = "";
+  }
+
+  function triggerUpload(targetFolderId?: Id<"folders">) {
+    uploadTargetRef.current = targetFolderId;
+    fileInputRef.current?.click();
+  }
+
   async function handleDrop(
     e: React.DragEvent,
     targetFolderId: Id<"folders"> | undefined
@@ -134,6 +174,19 @@ export default function FileExplorer() {
     e.preventDefault();
     e.stopPropagation();
     setDragOverId(null);
+
+    // Check for external file drops (from OS file manager)
+    if (e.dataTransfer.files.length > 0) {
+      const hasMarkdown = Array.from(e.dataTransfer.files).some((f) =>
+        f.name.endsWith(".md")
+      );
+      if (hasMarkdown) {
+        await handleUploadFiles(e.dataTransfer.files, targetFolderId);
+        return;
+      }
+    }
+
+    // Internal drag-and-drop (reordering notes/folders)
     try {
       const data = JSON.parse(e.dataTransfer.getData("text/plain"));
       if (data.type === "folder") {
@@ -238,6 +291,16 @@ export default function FileExplorer() {
                   className="p-0.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
                 >
                   <FolderPlus size={12} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerUpload(folder._id);
+                  }}
+                  className="p-0.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
+                  title="Upload .md files"
+                >
+                  <Upload size={12} />
                 </button>
                 <button
                   onClick={(e) => {
@@ -349,10 +412,25 @@ export default function FileExplorer() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept=".md"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
       <div className="px-3 py-2 border-b border-obsidian-border flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase text-obsidian-text-muted">
-          Explorer
-        </span>
+        {uploading ? (
+          <span className="flex items-center gap-1.5 text-xs text-obsidian-text-muted">
+            <Loader2 size={12} className="animate-spin" />
+            Uploading…
+          </span>
+        ) : (
+          <span className="text-xs font-semibold uppercase text-obsidian-text-muted">
+            Explorer
+          </span>
+        )}
         <div className="flex gap-1">
           <button
             onClick={() => handleCreateNote(undefined)}
@@ -367,6 +445,13 @@ export default function FileExplorer() {
             title="New Folder"
           >
             <FolderPlus size={14} />
+          </button>
+          <button
+            onClick={() => triggerUpload(undefined)}
+            className="p-1 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
+            title="Upload .md files"
+          >
+            <Upload size={14} />
           </button>
         </div>
       </div>

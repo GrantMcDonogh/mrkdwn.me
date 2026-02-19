@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseVaultFiles,
   batchNotes,
+  prepareUploadNotes,
   type ImportedNote,
 } from "./importVault";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -450,5 +451,235 @@ describe("parseVaultFiles — edge cases", () => {
     const result = await parseVaultFiles(fl);
     expect(result.folders).toHaveLength(5); // a, b, c, d, e
     expect(result.folders.map((f) => f.name)).toEqual(["a", "b", "c", "d", "e"]);
+  });
+});
+
+// --- Helper to build a simple FileList from filename→content (no webkitRelativePath) ---
+
+function makeSimpleFileList(
+  entries: [filename: string, content: string][]
+): FileList {
+  const files = entries.map(([name, content]) => new File([content], name));
+  const list = {
+    length: files.length,
+    item: (i: number) => files[i] ?? null,
+    [Symbol.iterator]: () => files[Symbol.iterator](),
+  } as unknown as FileList;
+  for (let i = 0; i < files.length; i++) {
+    (list as any)[i] = files[i];
+  }
+  return list;
+}
+
+// ---------- prepareUploadNotes — file filtering ----------
+
+describe("prepareUploadNotes — file filtering", () => {
+  it("filters to only .md files", async () => {
+    const fl = makeSimpleFileList([
+      ["note1.md", "# Hello"],
+      ["image.png", "binary"],
+      ["data.csv", "a,b,c"],
+      ["note2.md", "# World"],
+    ]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes).toHaveLength(2);
+    expect(notes.map((n) => n.title)).toEqual(["note1", "note2"]);
+  });
+
+  it("returns empty notes array when no .md files present", async () => {
+    const fl = makeSimpleFileList([
+      ["photo.jpg", "binary"],
+      ["readme.txt", "text"],
+    ]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes).toHaveLength(0);
+  });
+
+  it("returns empty notes for an empty FileList", async () => {
+    const fl = makeSimpleFileList([]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes).toHaveLength(0);
+  });
+
+  it("matches .md extension case-sensitively", async () => {
+    const fl = makeSimpleFileList([
+      ["lower.md", "ok"],
+      ["upper.MD", "ignored"],
+      ["mixed.Md", "ignored"],
+    ]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]!.title).toBe("lower");
+  });
+});
+
+// ---------- prepareUploadNotes — title derivation ----------
+
+describe("prepareUploadNotes — title derivation", () => {
+  it("strips .md extension from filename", async () => {
+    const fl = makeSimpleFileList([["My Great Note.md", "content"]]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes[0]!.title).toBe("My Great Note");
+  });
+
+  it("only strips the last .md (not intermediate dots)", async () => {
+    const fl = makeSimpleFileList([["file.v2.md", "content"]]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes[0]!.title).toBe("file.v2");
+  });
+
+  it("handles a filename that is just .md", async () => {
+    const fl = makeSimpleFileList([[".md", "content"]]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes[0]!.title).toBe("");
+  });
+});
+
+// ---------- prepareUploadNotes — content reading ----------
+
+describe("prepareUploadNotes — content reading", () => {
+  it("reads file text content correctly", async () => {
+    const fl = makeSimpleFileList([
+      ["note.md", "# Heading\n\nSome **bold** text."],
+    ]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes[0]!.content).toBe("# Heading\n\nSome **bold** text.");
+  });
+
+  it("handles empty .md files", async () => {
+    const fl = makeSimpleFileList([["empty.md", ""]]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes[0]!.content).toBe("");
+  });
+
+  it("preserves unicode content", async () => {
+    const fl = makeSimpleFileList([["unicode.md", "日本語テスト 🎉"]]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes[0]!.content).toBe("日本語テスト 🎉");
+  });
+});
+
+// ---------- prepareUploadNotes — ordering ----------
+
+describe("prepareUploadNotes — ordering", () => {
+  it("assigns sequential order starting from 0", async () => {
+    const fl = makeSimpleFileList([
+      ["a.md", "first"],
+      ["b.md", "second"],
+      ["c.md", "third"],
+    ]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes.map((n) => n.order)).toEqual([0, 1, 2]);
+  });
+
+  it("assigns order only among .md files (skipping non-md)", async () => {
+    const fl = makeSimpleFileList([
+      ["a.md", "first"],
+      ["skip.png", "binary"],
+      ["b.md", "second"],
+    ]);
+    const { notes } = await prepareUploadNotes(fl);
+    expect(notes).toHaveLength(2);
+    expect(notes.map((n) => n.order)).toEqual([0, 1]);
+  });
+});
+
+// ---------- prepareUploadNotes — folder targeting ----------
+
+describe("prepareUploadNotes — folder targeting", () => {
+  it("sets no folderTempId when no target folder specified", async () => {
+    const fl = makeSimpleFileList([["note.md", "content"]]);
+    const { notes, folderIdMap } = await prepareUploadNotes(fl);
+    expect(notes[0]!.folderTempId).toBeUndefined();
+    expect(Object.keys(folderIdMap)).toHaveLength(0);
+  });
+
+  it("sets folderTempId to 'target' when target folder specified", async () => {
+    const fl = makeSimpleFileList([
+      ["note1.md", "a"],
+      ["note2.md", "b"],
+    ]);
+    const { notes, folderIdMap } = await prepareUploadNotes(
+      fl,
+      "folders:abc123"
+    );
+    expect(notes[0]!.folderTempId).toBe("target");
+    expect(notes[1]!.folderTempId).toBe("target");
+    expect(folderIdMap).toEqual({ target: "folders:abc123" });
+  });
+
+  it("returns empty folderIdMap for root uploads even with .md files", async () => {
+    const fl = makeSimpleFileList([["note.md", "content"]]);
+    const { folderIdMap } = await prepareUploadNotes(fl, undefined);
+    expect(folderIdMap).toEqual({});
+  });
+});
+
+// ---------- prepareUploadNotes + batchNotes integration ----------
+
+describe("prepareUploadNotes + batchNotes integration", () => {
+  it("produces correct batches for root upload", async () => {
+    const fl = makeSimpleFileList([
+      ["alpha.md", "# Alpha"],
+      ["beta.md", "# Beta"],
+    ]);
+    const { notes, folderIdMap } = await prepareUploadNotes(fl);
+    const batches = batchNotes(notes, folderIdMap, FAKE_VAULT_ID);
+
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toHaveLength(2);
+    expect(batches[0]![0]!.title).toBe("alpha");
+    expect(batches[0]![0]!.content).toBe("# Alpha");
+    expect(batches[0]![0]!.vaultId).toBe(FAKE_VAULT_ID);
+    expect(batches[0]![0]!.folderId).toBeUndefined();
+    expect(batches[0]![1]!.title).toBe("beta");
+    expect(batches[0]![1]!.folderId).toBeUndefined();
+  });
+
+  it("produces correct batches for folder-targeted upload", async () => {
+    const targetFolder = "folders:xyz789" as Id<"folders">;
+    const fl = makeSimpleFileList([
+      ["note1.md", "content1"],
+      ["note2.md", "content2"],
+    ]);
+    const { notes, folderIdMap } = await prepareUploadNotes(fl, targetFolder);
+    const batches = batchNotes(notes, folderIdMap, FAKE_VAULT_ID);
+
+    expect(batches).toHaveLength(1);
+    for (const note of batches[0]!) {
+      expect(note.folderId).toBe(targetFolder);
+      expect(note.vaultId).toBe(FAKE_VAULT_ID);
+    }
+  });
+
+  it("filters non-md files before batching", async () => {
+    const fl = makeSimpleFileList([
+      ["valid.md", "markdown"],
+      ["invalid.txt", "text"],
+      ["also-valid.md", "more markdown"],
+      ["image.png", "binary"],
+    ]);
+    const { notes, folderIdMap } = await prepareUploadNotes(fl);
+    const batches = batchNotes(notes, folderIdMap, FAKE_VAULT_ID);
+
+    const allNotes = batches.flat();
+    expect(allNotes).toHaveLength(2);
+    expect(allNotes.map((n) => n.title)).toEqual(["valid", "also-valid"]);
+  });
+
+  it("splits large uploads into multiple batches", async () => {
+    const bigContent = "x".repeat(100_000);
+    const entries: [string, string][] = Array.from({ length: 15 }, (_, i) => [
+      `note${i}.md`,
+      bigContent,
+    ]);
+    const fl = makeSimpleFileList(entries);
+    const { notes, folderIdMap } = await prepareUploadNotes(fl);
+    const batches = batchNotes(notes, folderIdMap, FAKE_VAULT_ID);
+
+    // 15 notes * ~100KB = ~1.5MB, should need at least 2 batches at 800KB limit
+    expect(batches.length).toBeGreaterThanOrEqual(2);
+    const totalNotes = batches.reduce((sum, b) => sum + b.length, 0);
+    expect(totalNotes).toBe(15);
   });
 });

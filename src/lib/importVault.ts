@@ -191,6 +191,37 @@ async function parseObsidianSettings(
   return settings;
 }
 
+/**
+ * Prepare notes from a FileList for upload into an existing vault.
+ * Filters to .md files, reads content, and builds the folder ID mapping.
+ */
+export async function prepareUploadNotes(
+  files: FileList,
+  targetFolderId?: string
+): Promise<{ notes: ImportedNote[]; folderIdMap: Record<string, string> }> {
+  const mdFiles = Array.from(files).filter((f) => f.name.endsWith(".md"));
+
+  const notes: ImportedNote[] = [];
+  for (let i = 0; i < mdFiles.length; i++) {
+    const file = mdFiles[i]!;
+    const title = file.name.replace(/\.md$/, "");
+    const content = await file.text();
+    notes.push({
+      title,
+      content,
+      folderTempId: targetFolderId ? "target" : undefined,
+      order: i,
+    });
+  }
+
+  const folderIdMap: Record<string, string> = {};
+  if (targetFolderId) {
+    folderIdMap["target"] = targetFolderId;
+  }
+
+  return { notes, folderIdMap };
+}
+
 const MAX_BATCH_BYTES = 800_000;
 
 export function batchNotes(
