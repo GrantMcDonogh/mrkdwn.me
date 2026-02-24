@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { chat } from "./chat";
 import { chatEdit } from "./chatEdit";
 import { onboarding } from "./onboarding";
+import { testKey } from "./testKey";
 
 const http = httpRouter();
 
@@ -42,6 +43,19 @@ http.route({
   path: "/api/onboarding",
   method: "OPTIONS",
   handler: onboarding,
+});
+
+http.route({
+  path: "/api/test-openrouter-key",
+  method: "POST",
+  handler: testKey,
+});
+
+// CORS preflight for test-openrouter-key
+http.route({
+  path: "/api/test-openrouter-key",
+  method: "OPTIONS",
+  handler: testKey,
 });
 
 export default http;

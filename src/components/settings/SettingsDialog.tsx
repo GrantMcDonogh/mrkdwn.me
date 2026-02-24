@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { X, Key, ExternalLink } from "lucide-react";
@@ -12,9 +13,13 @@ export default function SettingsDialog({ onClose }: Props) {
   const saveKey = useMutation(api.userSettings.saveOpenRouterKey);
   const deleteKey = useMutation(api.userSettings.deleteOpenRouterKey);
 
+  const { getToken } = useAuth();
+
   const [keyInput, setKeyInput] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [testStatus, setTestStatus] = useState<"idle" | "testing" | "valid" | "invalid">("idle");
+  const [testError, setTestError] = useState("");
 
   const hasKey = keyStatus?.hasKey ?? false;
 
@@ -30,6 +35,35 @@ export default function SettingsDialog({ onClose }: Props) {
     } catch (err) {
       setStatus("error");
       setErrorMsg((err as Error).message);
+    }
+  }
+
+  async function handleTest() {
+    if (!keyInput.trim()) return;
+    setTestStatus("testing");
+    setTestError("");
+    try {
+      const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
+      const siteUrl = convexUrl.replace(".cloud", ".site");
+      const token = await getToken({ template: "convex" });
+      const res = await fetch(`${siteUrl}/api/test-openrouter-key`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ key: keyInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setTestStatus("valid");
+      } else {
+        setTestStatus("invalid");
+        setTestError(data.error || "Invalid key");
+      }
+    } catch (err) {
+      setTestStatus("invalid");
+      setTestError((err as Error).message);
     }
   }
 
@@ -96,13 +130,24 @@ export default function SettingsDialog({ onClose }: Props) {
               <input
                 type="password"
                 value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
+                onChange={(e) => {
+                  setKeyInput(e.target.value);
+                  setTestStatus("idle");
+                  setTestError("");
+                }}
                 placeholder="sk-or-..."
                 className="flex-1 bg-obsidian-bg border border-obsidian-border rounded px-3 py-1.5 text-sm text-obsidian-text font-mono focus:outline-none focus:border-obsidian-accent"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSave();
                 }}
               />
+              <button
+                onClick={handleTest}
+                disabled={!keyInput.trim() || testStatus === "testing"}
+                className="px-3 py-1.5 text-xs rounded border border-obsidian-border hover:bg-obsidian-bg-tertiary text-obsidian-text disabled:opacity-50 transition-colors"
+              >
+                {testStatus === "testing" ? "Testing..." : "Test"}
+              </button>
               <button
                 onClick={handleSave}
                 disabled={!keyInput.trim() || status === "saving"}
@@ -117,6 +162,12 @@ export default function SettingsDialog({ onClose }: Props) {
             )}
             {status === "error" && (
               <p className="text-xs text-red-400 mt-1">{errorMsg}</p>
+            )}
+            {testStatus === "valid" && (
+              <p className="text-xs text-green-400 mt-1">Key is valid</p>
+            )}
+            {testStatus === "invalid" && (
+              <p className="text-xs text-red-400 mt-1">{testError}</p>
             )}
           </div>
 
