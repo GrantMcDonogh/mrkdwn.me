@@ -48,7 +48,7 @@ Convex httpAction (convex/chatEdit.ts)
   | 1. Authenticate via ctx.auth.getUserIdentity()
   | 2. Retrieve user's OpenRouter key via userSettings.getOpenRouterKey
   | 3. Build context via chatEditHelpers.buildEditContext (includes active note)
-  | 4. Call OpenRouter API (anthropic/claude-sonnet-4-20250514) with stream: true
+  | 4. Call OpenRouter API (anthropic/claude-sonnet-4) with stream: true
   | 5. Stream response via TransformStream
   |
   v
@@ -139,9 +139,8 @@ The context builder uses a two-tier approach to maximize relevance within the to
 | Status | Condition |
 |--------|-----------|
 | 401 | No valid user identity |
-| 400 | Missing `vaultId` or `message`, or OpenRouter API key not configured |
+| 400 | Missing `vaultId` or `message`, OpenRouter API key not configured, or OpenRouter API returned a non-OK response (JSON body: `{ error: "..." }`) |
 | 403 | `buildEditContext` returned null |
-| 502 | OpenRouter API returned a non-OK response |
 | 500 | Server error |
 
 ### CORS
@@ -277,10 +276,11 @@ Custom hook that manages the streaming fetch lifecycle:
 
 1. Sends POST request to `/api/chat` or `/api/chat-edit` based on `options.useEditEndpoint`.
 2. For edit mode, includes `activeNoteId` in the request body.
-3. Reads the response body as a stream via `ReadableStream`.
-4. Decodes chunks and appends to the current assistant message.
-5. After streaming completes in edit mode, parses edit blocks via `parseEditBlocks()`.
-6. Exposes `updateBlockStatus(messageIndex, blockIndex, status)` for tracking apply/dismiss state.
+3. On error responses, attempts to parse JSON body (`{ error: "..." }`) for a clean error message, falling back to plain text.
+4. Reads the response body as a stream via `ReadableStream`.
+5. Decodes chunks and appends to the current assistant message.
+6. After streaming completes in edit mode, parses edit blocks via `parseEditBlocks()`.
+7. Exposes `updateBlockStatus(messageIndex, blockIndex, status)` for tracking apply/dismiss state.
 
 ### SettingsDialog
 
@@ -291,6 +291,7 @@ Modal dialog for managing user settings, accessible from the chat panel header (
 #### Features
 
 - **View key status**: Shows masked key (`sk-or-••••••••`) when configured
+- **Test key**: "Test" button validates the key against OpenRouter's free `GET /api/v1/auth/key` endpoint via the `/api/test-openrouter-key` backend route. Shows green "Key is valid" on success or a red error message on failure. Test status resets when the input changes.
 - **Save key**: Text input with "Save" button, validates non-empty
 - **Replace key**: Enter a new key when one already exists
 - **Remove key**: "Remove" button to delete the stored key
@@ -323,6 +324,7 @@ The OpenRouter API key for edit mode is stored per-user in the `userSettings` da
 | `convex/chatHelpers.ts` | Q&A context builder (internal query) |
 | `convex/chatEdit.ts` | Edit mode HTTP action (OpenRouter API) |
 | `convex/chatEditHelpers.ts` | Edit mode context builder with active note |
+| `convex/testKey.ts` | OpenRouter API key validation endpoint |
 | `convex/userSettings.ts` | OpenRouter key CRUD operations |
 | `src/components/chat/ChatPanel.tsx` | Chat panel UI with mode switching |
 | `src/components/chat/ChatMessage.tsx` | Message rendering with edit block support |

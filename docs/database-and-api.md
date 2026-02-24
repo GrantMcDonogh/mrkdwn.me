@@ -186,7 +186,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 
 | Function | Type | Description |
 |----------|------|-------------|
-| `chatEdit` | httpAction | Streaming AI chat with note editing capability. Authenticates via `ctx.auth.getUserIdentity()`, retrieves user's OpenRouter API key, builds context via `chatEditHelpers.buildEditContext` (includes active note), calls OpenRouter API (`anthropic/claude-sonnet-4-20250514`) with streaming. |
+| `chatEdit` | httpAction | Streaming AI chat with note editing capability. Authenticates via `ctx.auth.getUserIdentity()`, retrieves user's OpenRouter API key, builds context via `chatEditHelpers.buildEditContext` (includes active note), calls OpenRouter API (`anthropic/claude-sonnet-4`) with streaming. Returns 400 with JSON `{ error: "..." }` on OpenRouter API errors. |
 | `chatEditHelpers.buildEditContext` | internalQuery | Accepts `{ vaultId, query, activeNoteId? }`. Includes the active note's full content first (labelled as "ACTIVE NOTE"), then searches remaining notes via dual-index. Same two-tier context and 80K char limit as Q&A mode. |
 
 ### User Settings Operations
@@ -199,6 +199,14 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `userSettings.saveOpenRouterKey` | Mutation | `{ key }` | — | Save or update OpenRouter API key |
 | `userSettings.deleteOpenRouterKey` | Mutation | — | — | Remove OpenRouter API key |
 | `userSettings.getOpenRouterKey` | Internal Query | `{ userId }` | `string \| null` | Retrieve key (used by `chatEdit` httpAction) |
+
+### API Key Validation
+
+**File:** `convex/testKey.ts` (httpAction)
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `testKey` | httpAction | Validates an OpenRouter API key. Authenticates user, accepts `{ key }` in POST body, calls OpenRouter's free `GET /api/v1/auth/key` endpoint. Returns JSON `{ valid: true }` on success or `{ valid: false, error: "..." }` on failure. |
 
 ### Onboarding Operations
 
@@ -218,6 +226,8 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `/api/chat` | OPTIONS | `chat` | CORS preflight handling |
 | `/api/chat-edit` | POST | `chatEdit` | AI chat streaming endpoint (edit mode, requires OpenRouter key) |
 | `/api/chat-edit` | OPTIONS | `chatEdit` | CORS preflight handling |
+| `/api/test-openrouter-key` | POST | `testKey` | Validate an OpenRouter API key |
+| `/api/test-openrouter-key` | OPTIONS | `testKey` | CORS preflight handling |
 | `/api/onboarding` | POST | `onboarding` | AI onboarding vault generation |
 | `/api/onboarding` | OPTIONS | `onboarding` | CORS preflight handling |
 

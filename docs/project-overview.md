@@ -109,7 +109,8 @@ mrkdwn-me/
 │   ├── chatEditHelpers.ts        # Edit-mode context builder with active note
 │   ├── onboarding.ts             # AI onboarding wizard HTTP action
 │   ├── userSettings.ts           # User settings (OpenRouter key) CRUD
-│   ├── http.ts                   # HTTP routes (/api/chat, /api/chat-edit, /api/onboarding)
+│   ├── testKey.ts                # OpenRouter API key validation HTTP action
+│   ├── http.ts                   # HTTP routes (/api/chat, /api/chat-edit, /api/test-openrouter-key, /api/onboarding)
 │   └── _generated/               # Auto-generated API types
 │
 ├── mcp-server/                   # MCP server for AI tool access
