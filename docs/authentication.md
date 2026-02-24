@@ -157,11 +157,52 @@ const { signOut } = useClerk();
 2. **Session Persistence**: Clerk manages session tokens and restores sessions across page reloads. The `ClerkProvider` handles token refresh automatically.
 3. **Sign Out**: User clicks "Sign Out" on the vault selector → `useClerk().signOut()` is called → Clerk destroys the session → `useConvexAuth()` returns `isAuthenticated: false` → UI switches to `<AuthPage />`.
 
+## API Key Authentication (REST API)
+
+In addition to Clerk JWT auth for the web app, mrkdwn.me supports vault-scoped API keys for the public REST API v1 and MCP server.
+
+### How It Works
+
+1. User creates an API key in Settings → Vault API Keys (requires Clerk JWT auth).
+2. The backend generates a random key (`mk_<64 hex chars>`), hashes it with SHA-256, and stores only the hash in the `apiKeys` table.
+3. The raw key is returned once and never stored.
+4. API requests include the key as `Authorization: Bearer mk_...`.
+5. The `apiKeyAction` wrapper in `convex/apiHelpers.ts` hashes the incoming key and looks it up via the `by_hash` index.
+6. On match, the handler receives `{ vaultId, userId }` — no further auth is needed.
+7. `lastUsedAt` is updated on each use (fire-and-forget).
+
+### Key Properties
+
+- **Vault-scoped**: Each key grants access to exactly one vault. No vault listing is possible.
+- **Hash-only storage**: Only the SHA-256 hash is persisted. Compromise of the database does not reveal raw keys.
+- **Revocable**: Keys can be deleted from the Settings UI, immediately invalidating them.
+- **Display prefix**: The first 10 characters (`mk_a1b2c3d`) are stored for identification in the UI.
+
+### Management UI
+
+**File:** `src/components/settings/ApiKeyManager.tsx`
+
+Rendered inside the Settings dialog when a vault is active. Shows:
+- List of existing keys (prefix, name, last used date)
+- Create form with name input
+- One-time key reveal banner with copy button after creation
+- Revoke button per key
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `convex/apiKeys.ts` | Key CRUD (list, create, revoke) + internal validation functions |
+| `convex/apiHelpers.ts` | `apiKeyAction` wrapper + `requireApiKeyAuth` function |
+| `convex/internalApi.ts` | Auth-free internal queries/mutations called after key validation |
+| `src/components/settings/ApiKeyManager.tsx` | Frontend key management UI |
+
 ## Security Considerations
 
 - User accounts and credentials are managed entirely by Clerk's hosted infrastructure — no sensitive auth data is stored in Convex.
 - JWTs are validated server-side by Convex using the Clerk issuer domain configured in `convex/auth.config.ts`.
-- All Convex queries and mutations require a valid JWT; there are no public/unauthenticated endpoints for data access.
+- All Convex queries and mutations require a valid JWT; there are no public/unauthenticated endpoints for data access (except the REST API v1 which uses API key auth).
+- API keys are stored as SHA-256 hashes only — raw keys are shown once at creation and never retrievable.
 - There is no `users` table in the Convex schema — user identity is derived from the Clerk JWT's `tokenIdentifier`.
 
 ## Environment Variables

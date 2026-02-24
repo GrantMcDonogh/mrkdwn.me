@@ -223,11 +223,24 @@ The vault selector is the first screen shown after authentication. It displays a
 
 Users can download any vault as a `.zip` file containing all notes as `.md` files in the vault's folder hierarchy. The ZIP is built entirely client-side using JSZip — no backend changes are needed. See [Download Vault](./download-vault.md) for full details.
 
+## Vault API Keys
+
+Each vault can have multiple API keys for REST API and MCP server access. Keys are managed in Settings → Vault API Keys.
+
+- **Vault-scoped**: Each key grants access to exactly one vault.
+- **Hash-only storage**: Only the SHA-256 hash is stored in the `apiKeys` table.
+- **One-time reveal**: The raw key is shown once at creation and cannot be retrieved.
+- **Revocable**: Keys can be deleted immediately from the Settings UI.
+- **Last used tracking**: Each key tracks when it was last used for an API request.
+
+See [Authentication](./authentication.md#api-key-authentication-rest-api) for implementation details.
+
 ## Ownership & Access Control
 
 - All vault operations verify that the requesting user owns the vault.
 - There is no sharing mechanism — vaults are strictly single-user.
 - The `by_user` index ensures only the owner's vaults are returned in queries.
+- API keys provide scoped external access to a single vault without exposing other vaults.
 
 ## Cascade Deletion Behavior
 

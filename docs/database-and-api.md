@@ -50,6 +50,21 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 │ openRouterKey? │
 │ idx: by_user   │
 └────────────────┘
+
+┌────────────────┐
+│   apiKeys      │
+│────────────────│
+│ _id            │
+│ keyHash ───────┼──→ SHA-256 hash of raw key
+│ keyPrefix      │    (first 10 chars for display)
+│ vaultId ───────┼──→ vaults._id
+│ userId ────────┼──→ Clerk tokenIdentifier (string)
+│ name           │
+│ createdAt      │
+│ lastUsedAt?    │
+│ idx: by_hash   │
+│ idx: by_vault  │
+└────────────────┘
 ```
 
 ### Tables
@@ -115,6 +130,23 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 **Indexes:**
 - `by_user` → `["userId"]` — Lookup settings by user
 
+#### `apiKeys`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `_id` | `Id<"apiKeys">` | Primary key |
+| `keyHash` | `v.string()` | SHA-256 hash of the raw API key (the full key is never stored) |
+| `keyPrefix` | `v.string()` | First 10 characters of the key for display (e.g. `mk_a1b2c3d`) |
+| `vaultId` | `v.id("vaults")` | The vault this key grants access to |
+| `userId` | `v.string()` | Clerk `tokenIdentifier` of the key's owner |
+| `name` | `v.string()` | User-provided label (e.g. "Claude Code") |
+| `createdAt` | `v.number()` | Creation timestamp |
+| `lastUsedAt` | `v.optional(v.number())` | Last time the key was used to authenticate an API request |
+
+**Indexes:**
+- `by_hash` → `["keyHash"]` — Fast lookup by key hash for authentication
+- `by_vault` → `["vaultId"]` — List all keys for a vault
+
 ---
 
 ## API Reference
@@ -162,6 +194,45 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `notes.getBacklinks` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get notes linking to this note |
 | `notes.getUnlinkedMentions` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get unlinked title mentions |
 | `notes.importBatch` | Mutation | `{ notes }` | — | Batch-create notes (called from client during vault import) |
+
+### API Key Operations
+
+**File:** `convex/apiKeys.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `apiKeys.list` | Query | `{ vaultId }` | `{ _id, keyPrefix, name, createdAt, lastUsedAt }[]` | List API keys for a vault (Clerk JWT auth) |
+| `apiKeys.create` | Action | `{ vaultId, name }` | `{ key }` | Generate a new API key (`mk_<64hex>`), store SHA-256 hash, return raw key once |
+| `apiKeys.revoke` | Mutation | `{ id }` | — | Delete an API key (Clerk JWT auth, ownership check) |
+| `apiKeys.validateKey` | Internal Query | `{ keyHash }` | `{ userId, vaultId, keyId } \| null` | Lookup key by hash for httpAction auth |
+| `apiKeys.touchLastUsed` | Internal Mutation | `{ id }` | — | Update `lastUsedAt` timestamp |
+| `apiKeys.getVaultForUser` | Internal Query | `{ vaultId, userId }` | `Vault \| null` | Verify vault ownership (used by create action) |
+| `apiKeys.insertKey` | Internal Mutation | `{ keyHash, keyPrefix, vaultId, userId, name, createdAt }` | `Id<"apiKeys">` | Store key record (used by create action) |
+
+### Internal API (Auth-free)
+
+**File:** `convex/internalApi.ts`
+
+Internal queries and mutations called by httpActions after API key validation. Each validates that the resource belongs to the given vault (defense-in-depth). These mirror the logic in `folders.ts` and `notes.ts` but skip `ctx.auth` checks.
+
+| Function | Type | Parameters | Description |
+|----------|------|-----------|-------------|
+| `internalApi.getVault` | Internal Query | `{ vaultId }` | Get vault name and createdAt |
+| `internalApi.listFolders` | Internal Query | `{ vaultId }` | List all folders in vault |
+| `internalApi.createFolder` | Internal Mutation | `{ name, vaultId, parentId? }` | Create folder |
+| `internalApi.renameFolder` | Internal Mutation | `{ id, vaultId, name }` | Rename folder (vault ownership check) |
+| `internalApi.moveFolder` | Internal Mutation | `{ id, vaultId, parentId? }` | Move folder |
+| `internalApi.removeFolder` | Internal Mutation | `{ id, vaultId }` | Delete folder (children promoted) |
+| `internalApi.listNotes` | Internal Query | `{ vaultId }` | List all notes in vault |
+| `internalApi.getNote` | Internal Query | `{ id, vaultId }` | Get note (vault ownership check) |
+| `internalApi.createNote` | Internal Mutation | `{ title, vaultId, folderId? }` | Create note |
+| `internalApi.updateNote` | Internal Mutation | `{ id, vaultId, content }` | Update note content |
+| `internalApi.renameNote` | Internal Mutation | `{ id, vaultId, title }` | Rename note + wiki link propagation |
+| `internalApi.moveNote` | Internal Mutation | `{ id, vaultId, folderId? }` | Move note |
+| `internalApi.removeNote` | Internal Mutation | `{ id, vaultId }` | Delete note |
+| `internalApi.searchNotes` | Internal Query | `{ vaultId, query }` | Full-text search (title + content) |
+| `internalApi.getBacklinks` | Internal Query | `{ noteId, vaultId }` | Get backlinks |
+| `internalApi.getUnlinkedMentions` | Internal Query | `{ noteId, vaultId }` | Get unlinked mentions |
 
 ### Import Operations
 
@@ -220,6 +291,8 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 
 **File:** `convex/http.ts`
 
+#### Internal endpoints (Clerk JWT auth)
+
 | Route | Method | Handler | Purpose |
 |-------|--------|---------|---------|
 | `/api/chat` | POST | `chat` | AI chat streaming endpoint (Q&A mode) |
@@ -231,9 +304,38 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `/api/onboarding` | POST | `onboarding` | AI onboarding vault generation |
 | `/api/onboarding` | OPTIONS | `onboarding` | CORS preflight handling |
 
+#### Public REST API v1 (API key auth: `Authorization: Bearer mk_...`)
+
+**Files:** `convex/apiVaults.ts`, `convex/apiFolders.ts`, `convex/apiNotes.ts`, `convex/apiHelpers.ts`
+
+All endpoints use the `apiKeyAction` wrapper which handles OPTIONS preflight, extracts the API key from the `Authorization` header, hashes it with SHA-256, validates against the `apiKeys` table, and passes `{ vaultId, userId }` to the handler. The vault is implicit from the API key — no `vaultId` parameter is needed.
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/v1/vault` | GET | Get vault info (name, createdAt) |
+| `/api/v1/folders` | GET | List all folders |
+| `/api/v1/folders` | POST | Create folder `{ name, parentId? }` |
+| `/api/v1/folders/rename` | PATCH | Rename folder `{ id, name }` |
+| `/api/v1/folders/move` | PATCH | Move folder `{ id, parentId? }` |
+| `/api/v1/folders` | DELETE | Delete folder `?id=` |
+| `/api/v1/notes` | GET | List all notes |
+| `/api/v1/notes/get` | GET | Get note `?id=` |
+| `/api/v1/notes/search` | GET | Search notes `?query=` |
+| `/api/v1/notes/backlinks` | GET | Get backlinks `?noteId=` |
+| `/api/v1/notes/unlinked-mentions` | GET | Get unlinked mentions `?noteId=` |
+| `/api/v1/notes` | POST | Create note `{ title, folderId? }` |
+| `/api/v1/notes/update` | PATCH | Update note `{ id, content }` |
+| `/api/v1/notes/rename` | PATCH | Rename note `{ id, title }` |
+| `/api/v1/notes/move` | PATCH | Move note `{ id, folderId? }` |
+| `/api/v1/notes` | DELETE | Delete note `?id=` |
+
+Response format: `{ ok: true, data: ... }` on success, `{ ok: false, error: "..." }` on error.
+
 ---
 
-## Authorization Pattern
+## Authorization Patterns
+
+### Clerk JWT Auth (frontend queries/mutations)
 
 Every query and mutation follows the same authorization pattern:
 
@@ -259,6 +361,26 @@ export const someFunction = query({
 - **Authentication**: Every function calls `ctx.auth.getUserIdentity()` to verify the Clerk JWT.
 - **Authorization**: Vault operations verify that the requesting user's `tokenIdentifier` matches the vault's `userId`.
 - **Data isolation**: Queries are scoped by `userId` (vaults) or `vaultId` (folders/notes).
+
+### API Key Auth (REST API v1)
+
+The REST API uses vault-scoped API keys (`mk_<64hex>`) instead of Clerk JWTs:
+
+```typescript
+// In apiHelpers.ts — apiKeyAction wrapper
+async function requireApiKeyAuth(ctx, request) {
+  // 1. Extract "Bearer mk_..." from Authorization header
+  // 2. SHA-256 hash the raw key
+  // 3. Lookup by hash in apiKeys table
+  // 4. Return { vaultId, userId } or 401
+  // 5. Fire-and-forget: update lastUsedAt
+}
+```
+
+- **Authentication**: The `apiKeyAction` wrapper extracts and hashes the bearer token, then looks it up via the `by_hash` index on the `apiKeys` table.
+- **Authorization**: The API key is scoped to a single vault. The `vaultId` is passed to internal functions which additionally verify resource ownership (defense-in-depth).
+- **Key security**: Only the SHA-256 hash is stored. The raw key is shown once at creation and never retrievable again.
+- **No vault listing**: API key users cannot list or access other vaults — the vault is implicit from the key.
 
 ---
 

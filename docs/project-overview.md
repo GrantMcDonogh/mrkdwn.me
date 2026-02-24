@@ -82,7 +82,7 @@ mrkdwn-me/
 │   │   ├── graph/                # D3.js graph visualization
 │   │   ├── layout/               # App layout, sidebar, split panes, tabs
 │   │   ├── search/               # Search panel
-│   │   ├── settings/             # Settings dialog (API keys)
+│   │   ├── settings/             # Settings dialog (OpenRouter key, vault API keys)
 │   │   └── vault/                # Vault selection, management & onboarding
 │   ├── hooks/
 │   │   ├── useDownloadVault.ts   # Vault download hook
@@ -103,6 +103,12 @@ mrkdwn-me/
 │   ├── vaults.ts                 # Vault CRUD operations
 │   ├── folders.ts                # Folder management
 │   ├── notes.ts                  # Note CRUD, search, backlinks
+│   ├── apiKeys.ts                # Vault API key CRUD + internal validation
+│   ├── internalApi.ts            # Auth-free internal queries/mutations for REST API
+│   ├── apiHelpers.ts             # HTTP action wrappers (apiAction, apiKeyAction)
+│   ├── apiVaults.ts              # REST API v1 vault endpoint
+│   ├── apiFolders.ts             # REST API v1 folder endpoints
+│   ├── apiNotes.ts               # REST API v1 note endpoints
 │   ├── chat.ts                   # AI chat HTTP action (Claude API, Q&A mode)
 │   ├── chatHelpers.ts            # RAG context builder (internal query)
 │   ├── chatEdit.ts               # AI chat HTTP action (OpenRouter, edit mode)
@@ -110,11 +116,14 @@ mrkdwn-me/
 │   ├── onboarding.ts             # AI onboarding wizard HTTP action
 │   ├── userSettings.ts           # User settings (OpenRouter key) CRUD
 │   ├── testKey.ts                # OpenRouter API key validation HTTP action
-│   ├── http.ts                   # HTTP routes (/api/chat, /api/chat-edit, /api/test-openrouter-key, /api/onboarding)
+│   ├── http.ts                   # HTTP routes (chat, REST API v1, onboarding)
 │   └── _generated/               # Auto-generated API types
 │
 ├── mcp-server/                   # MCP server for AI tool access
-│   ├── src/                      # Server source (tools for vaults/folders/notes)
+│   ├── src/
+│   │   ├── index.ts              # Entry point, MCP server setup, stdio transport
+│   │   ├── api-client.ts         # Fetch-based REST API client
+│   │   └── tools/                # Tool definitions (vaults, folders, notes)
 │   ├── package.json
 │   └── tsconfig.json
 │
@@ -131,16 +140,18 @@ mrkdwn-me/
 
 ## Data Model Overview
 
-The application has four database tables (users are managed by Clerk):
+The application has five database tables (users are managed by Clerk):
 
 - **Vaults** - Top-level containers owned by a user (identified by Clerk `tokenIdentifier`). All notes and folders belong to a vault.
 - **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`. Have an `order` field for sorting.
 - **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content. Have `order`, `createdAt`, and `updatedAt` fields.
 - **User Settings** - Per-user configuration (OpenRouter API key for chat edit mode). Keyed by Clerk `tokenIdentifier`.
+- **API Keys** - Vault-scoped API keys for the REST API and MCP server. Only the SHA-256 hash is stored; the raw key is shown once at creation.
 
 ```
 User (Clerk) 1──* Vault 1──* Folder (self-referencing parentId)
-                           1──* Note
+                       | 1──* Note
+                       | 1──* ApiKey
              1──1 UserSettings
 ```
 
