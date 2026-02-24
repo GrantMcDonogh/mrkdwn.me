@@ -2,13 +2,16 @@ import { useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { X, Key, ExternalLink } from "lucide-react";
+import ApiKeyManager from "./ApiKeyManager";
 
 interface Props {
   onClose: () => void;
+  vaultId?: Id<"vaults">;
 }
 
-export default function SettingsDialog({ onClose }: Props) {
+export default function SettingsDialog({ onClose, vaultId }: Props) {
   const keyStatus = useQuery(api.userSettings.hasOpenRouterKey);
   const saveKey = useMutation(api.userSettings.saveOpenRouterKey);
   const deleteKey = useMutation(api.userSettings.deleteOpenRouterKey);
@@ -182,6 +185,12 @@ export default function SettingsDialog({ onClose }: Props) {
               <ExternalLink size={10} />
             </a>
           </div>
+
+          {vaultId && (
+            <div className="border-t border-obsidian-border pt-4">
+              <ApiKeyManager vaultId={vaultId} />
+            </div>
+          )}
         </div>
       </div>
     </div>

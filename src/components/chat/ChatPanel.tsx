@@ -133,7 +133,7 @@ export default function ChatPanel() {
       </form>
 
       {showSettings && (
-        <SettingsDialog onClose={() => setShowSettings(false)} />
+        <SettingsDialog onClose={() => setShowSettings(false)} vaultId={vaultId} />
       )}
     </div>
   );

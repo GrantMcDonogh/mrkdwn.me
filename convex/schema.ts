@@ -41,4 +41,16 @@ export default defineSchema({
     userId: v.string(),
     openRouterKey: v.optional(v.string()),
   }).index("by_user", ["userId"]),
+
+  apiKeys: defineTable({
+    keyHash: v.string(),
+    keyPrefix: v.string(),
+    vaultId: v.id("vaults"),
+    userId: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
+  })
+    .index("by_hash", ["keyHash"])
+    .index("by_vault", ["vaultId"]),
 });

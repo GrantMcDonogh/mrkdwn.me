@@ -1,61 +1,57 @@
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { apiAction, jsonOk, requireAuth, requireQueryParam, parseBody } from "./apiHelpers";
+import { apiKeyAction, jsonOk, jsonError, requireQueryParam, parseBody } from "./apiHelpers";
 
-export const listFolders = apiAction(async (ctx, request) => {
-  const auth = await requireAuth(ctx, request);
-  if (auth.errorResponse) return auth.errorResponse;
-  const param = requireQueryParam(request, "vaultId");
-  if (param.errorResponse) return param.errorResponse;
-  const data = await ctx.runQuery(api.folders.list, { vaultId: param.value as Id<"vaults"> });
+export const listFolders = apiKeyAction(async (ctx, request, auth) => {
+  const data = await ctx.runQuery(internal.internalApi.listFolders, { vaultId: auth.vaultId });
   return jsonOk(request, data);
 });
 
-export const createFolder = apiAction(async (ctx, request) => {
-  const auth = await requireAuth(ctx, request);
-  if (auth.errorResponse) return auth.errorResponse;
-  const parsed = await parseBody<{ name: string; vaultId: string; parentId?: string }>(request);
+export const createFolder = apiKeyAction(async (ctx, request, auth) => {
+  const parsed = await parseBody<{ name: string; parentId?: string }>(request);
   if (parsed.errorResponse) return parsed.errorResponse;
-  const { name, vaultId, parentId } = parsed.body;
-  if (!name || !vaultId) return jsonOk(request, null, 400);
-  const id = await ctx.runMutation(api.folders.create, {
+  const { name, parentId } = parsed.body;
+  if (!name) return jsonError(request, "Missing required field: name", 400);
+  const id = await ctx.runMutation(internal.internalApi.createFolder, {
     name,
-    vaultId: vaultId as Id<"vaults">,
+    vaultId: auth.vaultId,
     parentId: parentId ? (parentId as Id<"folders">) : undefined,
   });
   return jsonOk(request, { id }, 201);
 });
 
-export const renameFolder = apiAction(async (ctx, request) => {
-  const auth = await requireAuth(ctx, request);
-  if (auth.errorResponse) return auth.errorResponse;
+export const renameFolder = apiKeyAction(async (ctx, request, auth) => {
   const parsed = await parseBody<{ id: string; name: string }>(request);
   if (parsed.errorResponse) return parsed.errorResponse;
   const { id, name } = parsed.body;
-  if (!id || !name) return jsonOk(request, null, 400);
-  await ctx.runMutation(api.folders.rename, { id: id as Id<"folders">, name });
+  if (!id || !name) return jsonError(request, "Missing required fields: id, name", 400);
+  await ctx.runMutation(internal.internalApi.renameFolder, {
+    id: id as Id<"folders">,
+    vaultId: auth.vaultId,
+    name,
+  });
   return jsonOk(request, null);
 });
 
-export const moveFolder = apiAction(async (ctx, request) => {
-  const auth = await requireAuth(ctx, request);
-  if (auth.errorResponse) return auth.errorResponse;
+export const moveFolder = apiKeyAction(async (ctx, request, auth) => {
   const parsed = await parseBody<{ id: string; parentId?: string }>(request);
   if (parsed.errorResponse) return parsed.errorResponse;
   const { id, parentId } = parsed.body;
-  if (!id) return jsonOk(request, null, 400);
-  await ctx.runMutation(api.folders.move, {
+  if (!id) return jsonError(request, "Missing required field: id", 400);
+  await ctx.runMutation(internal.internalApi.moveFolder, {
     id: id as Id<"folders">,
+    vaultId: auth.vaultId,
     parentId: parentId ? (parentId as Id<"folders">) : undefined,
   });
   return jsonOk(request, null);
 });
 
-export const deleteFolder = apiAction(async (ctx, request) => {
-  const auth = await requireAuth(ctx, request);
-  if (auth.errorResponse) return auth.errorResponse;
+export const deleteFolder = apiKeyAction(async (ctx, request, auth) => {
   const param = requireQueryParam(request, "id");
   if (param.errorResponse) return param.errorResponse;
-  await ctx.runMutation(api.folders.remove, { id: param.value as Id<"folders"> });
+  await ctx.runMutation(internal.internalApi.removeFolder, {
+    id: param.value as Id<"folders">,
+    vaultId: auth.vaultId,
+  });
   return jsonOk(request, null);
 });

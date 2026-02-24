@@ -1,34 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { client } from "../convex-client.js";
-import { api } from "../../convex/_generated/api.js";
+import * as api from "../api-client.js";
 
 export function registerVaultTools(server: McpServer) {
-  server.tool("list_vaults", "List all vaults for the authenticated user", {}, async () => {
-    const vaults = await client.query(api.vaults.list);
+  server.tool("get_vault", "Get info about the vault this API key is scoped to", {}, async () => {
+    const vault = await api.getVault();
     return {
       content: [
         {
           type: "text" as const,
-          text: JSON.stringify(vaults, null, 2),
+          text: JSON.stringify(vault, null, 2),
         },
       ],
     };
   });
-
-  server.tool(
-    "get_vault",
-    "Get a vault by ID",
-    { vaultId: { type: "string", description: "The vault ID" } },
-    async ({ vaultId }) => {
-      const vault = await client.query(api.vaults.get, { id: vaultId as any });
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify(vault, null, 2),
-          },
-        ],
-      };
-    }
-  );
 }

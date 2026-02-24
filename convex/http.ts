@@ -3,9 +3,7 @@ import { chat } from "./chat";
 import { chatEdit } from "./chatEdit";
 import { onboarding } from "./onboarding";
 import { testKey } from "./testKey";
-import {
-  listVaults, getVault, createVault, renameVault, deleteVault,
-} from "./apiVaults";
+import { getVault } from "./apiVaults";
 import {
   listFolders, createFolder, renameFolder, moveFolder, deleteFolder,
 } from "./apiFolders";
@@ -70,15 +68,9 @@ http.route({
 
 // --- Public REST API v1 ---
 
-// Vaults
-http.route({ path: "/api/v1/vaults", method: "GET", handler: listVaults });
-http.route({ path: "/api/v1/vaults", method: "OPTIONS", handler: listVaults });
-http.route({ path: "/api/v1/vaults/get", method: "GET", handler: getVault });
-http.route({ path: "/api/v1/vaults/get", method: "OPTIONS", handler: getVault });
-http.route({ path: "/api/v1/vaults", method: "POST", handler: createVault });
-http.route({ path: "/api/v1/vaults/rename", method: "PATCH", handler: renameVault });
-http.route({ path: "/api/v1/vaults/rename", method: "OPTIONS", handler: renameVault });
-http.route({ path: "/api/v1/vaults", method: "DELETE", handler: deleteVault });
+// Vault (singular — scoped by API key)
+http.route({ path: "/api/v1/vault", method: "GET", handler: getVault });
+http.route({ path: "/api/v1/vault", method: "OPTIONS", handler: getVault });
 
 // Folders
 http.route({ path: "/api/v1/folders", method: "GET", handler: listFolders });

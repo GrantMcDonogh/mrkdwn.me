@@ -235,7 +235,7 @@ export default function AppLayout() {
         <QuickSwitcher onClose={() => setShowQuickSwitcher(false)} />
       )}
       {showSettings && (
-        <SettingsDialog onClose={() => setShowSettings(false)} />
+        <SettingsDialog onClose={() => setShowSettings(false)} vaultId={state.vaultId ?? undefined} />
       )}
     </div>
   );

@@ -1,5 +1,7 @@
 import { httpAction } from "./_generated/server";
 import type { ActionCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 
 // --- CORS ---
 
@@ -88,6 +90,67 @@ export function apiAction(handler: ApiHandler) {
       }
       if (message.includes("Not authenticated")) {
         return jsonError(request, message, 401);
+      }
+      return jsonError(request, message, 400);
+    }
+  });
+}
+
+// --- API Key Auth ---
+
+async function requireApiKeyAuth(
+  ctx: ActionCtx,
+  request: Request
+): Promise<
+  | { vaultId: Id<"vaults">; userId: string; errorResponse: null }
+  | { vaultId: null; userId: null; errorResponse: Response }
+> {
+  const authHeader = request.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer mk_")) {
+    return { vaultId: null, userId: null, errorResponse: jsonError(request, "Unauthorized", 401) };
+  }
+  const rawKey = authHeader.slice("Bearer ".length);
+
+  // Hash with SHA-256
+  const encoder = new TextEncoder();
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(rawKey));
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  const result = await ctx.runQuery(internal.apiKeys.validateKey, { keyHash });
+  if (!result) {
+    return { vaultId: null, userId: null, errorResponse: jsonError(request, "Unauthorized", 401) };
+  }
+
+  // Touch lastUsedAt in background (fire and forget)
+  void ctx.runMutation(internal.apiKeys.touchLastUsed, { id: result.keyId });
+
+  return { vaultId: result.vaultId, userId: result.userId, errorResponse: null };
+}
+
+type ApiKeyHandler = (
+  ctx: ActionCtx,
+  request: Request,
+  auth: { vaultId: Id<"vaults">; userId: string }
+) => Promise<Response>;
+
+/**
+ * Wraps an httpAction handler with:
+ * - OPTIONS preflight handling
+ * - API key authentication (Bearer mk_...)
+ * - try/catch mapping errors to appropriate status codes
+ */
+export function apiKeyAction(handler: ApiKeyHandler) {
+  return httpAction(async (ctx, request) => {
+    if (request.method === "OPTIONS") return optionsResponse(request);
+    try {
+      const auth = await requireApiKeyAuth(ctx, request);
+      if (auth.errorResponse) return auth.errorResponse;
+      return await handler(ctx, request, { vaultId: auth.vaultId, userId: auth.userId });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Internal error";
+      if (message.includes("not found") || message.includes("Not found")) {
+        return jsonError(request, message, 404);
       }
       return jsonError(request, message, 400);
     }
