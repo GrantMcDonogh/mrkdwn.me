@@ -16,9 +16,10 @@ export default function ChatPanel() {
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [editModeOn, setEditModeOn] = useState(false);
 
   const keyStatus = useQuery(api.userSettings.hasOpenRouterKey);
-  const hasEditMode = keyStatus?.hasKey ?? false;
+  const hasKey = keyStatus?.hasKey ?? false;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -33,8 +34,8 @@ export default function ChatPanel() {
     const msg = input.trim();
     setInput("");
     await sendMessage(vaultId, msg, {
-      activeNoteId: hasEditMode && activeNoteId ? activeNoteId : undefined,
-      useEditEndpoint: hasEditMode,
+      activeNoteId: editModeOn && activeNoteId ? activeNoteId : undefined,
+      useEditEndpoint: editModeOn,
     });
   }
 
@@ -45,11 +46,19 @@ export default function ChatPanel() {
           <span className="text-xs font-semibold uppercase text-obsidian-text-muted">
             Chat
           </span>
-          {hasEditMode && (
-            <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-obsidian-accent/20 text-obsidian-accent">
+          {hasKey && (
+            <button
+              onClick={() => setEditModeOn((v) => !v)}
+              className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors ${
+                editModeOn
+                  ? "bg-obsidian-accent/20 text-obsidian-accent"
+                  : "bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
+              }`}
+              title={editModeOn ? "Disable edit mode" : "Enable edit mode"}
+            >
               <Sparkles size={10} />
               Edit mode
-            </span>
+            </button>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -76,7 +85,7 @@ export default function ChatPanel() {
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 px-4">
             <p className="text-sm text-obsidian-text-muted text-center">
-              {hasEditMode
+              {editModeOn
                 ? "Ask about or edit your notes..."
                 : "Ask questions about your vault notes"}
             </p>
@@ -106,7 +115,7 @@ export default function ChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              hasEditMode
+              editModeOn
                 ? "Ask about or edit your notes..."
                 : "Ask about your notes..."
             }
