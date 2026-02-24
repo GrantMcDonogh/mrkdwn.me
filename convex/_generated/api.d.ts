@@ -17,6 +17,7 @@ import type * as http from "../http.js";
 import type * as importVault from "../importVault.js";
 import type * as notes from "../notes.js";
 import type * as onboarding from "../onboarding.js";
+import type * as testKey from "../testKey.js";
 import type * as userSettings from "../userSettings.js";
 import type * as vaults from "../vaults.js";
 
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   importVault: typeof importVault;
   notes: typeof notes;
   onboarding: typeof onboarding;
+  testKey: typeof testKey;
   userSettings: typeof userSettings;
   vaults: typeof vaults;
 }>;

@@ -33,13 +33,12 @@
       "Bash(python -m base64:*)",
       "Bash(npx vitest run:*)",
       "Bash(npx vite build)",
-      "Bash(dir:*)",
-      "Bash(vercel --version:*)",
-      "Bash(vercel whoami:*)",
-      "Bash(vercel login:*)",
+      "Bash(ls:*)",
+      "Bash(tail:*)",
       "Bash(vercel:*)",
-      "mcp__ide__getDiagnostics",
-      "WebFetch(domain:github.com)"
+      "Bash(git:*)",
+      "Bash(grep -c \"^export const\" /d/Dev/mrkdwn.me/convex/*.ts)",
+      "Bash(curl -s https://openrouter.ai/api/v1/models | python3 -c \"import sys,json; models=json.load\\(sys.stdin\\)['data']; [print\\(m['id']\\) for m in models if 'claude' in m['id'].lower\\(\\) and 'sonnet' in m['id'].lower\\(\\)]\" 2>&1)"
     ]
   }
 }
