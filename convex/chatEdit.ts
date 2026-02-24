@@ -95,7 +95,7 @@ When the user asks you to create a new note, output:
           Authorization: `Bearer ${openRouterKey}`,
         },
         body: JSON.stringify({
-          model: "anthropic/claude-sonnet-4-20250514",
+          model: "anthropic/claude-sonnet-4",
           max_tokens: 4096,
           stream: true,
           messages: [
