@@ -71,19 +71,17 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
 
   const components: Components = useMemo(
     () => ({
-      a: ({ href, children, ...props }) => {
+      a: ({ href, children }) => {
         if (href?.startsWith("wikilink://")) {
           const title = decodeURIComponent(href.replace("wikilink://", ""));
           return (
             <a
-              {...props}
               className="markdown-preview-wikilink"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 navigateToNote(title);
               }}
-              href="#"
             >
               {children}
             </a>
@@ -95,7 +93,7 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
           );
         }
         return (
-          <a {...props} href={href} target="_blank" rel="noopener noreferrer">
+          <a href={href} target="_blank" rel="noopener noreferrer">
             {children}
           </a>
         );
