@@ -37,8 +37,23 @@
       "Bash(tail:*)",
       "Bash(vercel:*)",
       "Bash(git:*)",
-      "Bash(grep -c \"^export const\" /d/Dev/mrkdwn.me/convex/*.ts)",
-      "Bash(curl -s https://openrouter.ai/api/v1/models | python3 -c \"import sys,json; models=json.load\\(sys.stdin\\)['data']; [print\\(m['id']\\) for m in models if 'claude' in m['id'].lower\\(\\) and 'sonnet' in m['id'].lower\\(\\)]\" 2>&1)"
+      "Bash(echo:*)",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "Bash(cd D:/Dev/mrkdwn.me && npm run build 2>&1)",
+      "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm run build 2>&1)",
+      "Bash(head:*)",
+      "Bash(npm run build:*)",
+      "Bash(rm:*)"
     ]
+  },
+  "mcpServers": {
+    "mrkdwn": {
+      "command": "node",
+      "args": ["D:/Dev/mrkdwn.me/mcp-server/dist/index.js"],
+      "env": {
+        "MRKDWN_API_URL": "https://beaming-panda-407.convex.site",
+        "MRKDWN_API_KEY": "mk_fd09b076f6a71b8c0bd13d8b33893a0696f6f30b7fa8df08d4efefd5720bdab4"
+      }
+    }
   }
 }
