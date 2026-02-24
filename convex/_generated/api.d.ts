@@ -8,6 +8,10 @@
  * @module
  */
 
+import type * as apiFolders from "../apiFolders.js";
+import type * as apiHelpers from "../apiHelpers.js";
+import type * as apiNotes from "../apiNotes.js";
+import type * as apiVaults from "../apiVaults.js";
 import type * as chat from "../chat.js";
 import type * as chatEdit from "../chatEdit.js";
 import type * as chatEditHelpers from "../chatEditHelpers.js";
@@ -28,6 +32,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  apiFolders: typeof apiFolders;
+  apiHelpers: typeof apiHelpers;
+  apiNotes: typeof apiNotes;
+  apiVaults: typeof apiVaults;
   chat: typeof chat;
   chatEdit: typeof chatEdit;
   chatEditHelpers: typeof chatEditHelpers;
