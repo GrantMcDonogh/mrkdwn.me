@@ -59,7 +59,13 @@ export function useChatStream() {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
+          let errorText: string;
+          try {
+            const data = await response.json();
+            errorText = data.error ?? JSON.stringify(data);
+          } catch {
+            errorText = await response.text();
+          }
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {

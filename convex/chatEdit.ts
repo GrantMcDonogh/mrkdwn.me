@@ -19,6 +19,7 @@ export const chatEdit = httpAction(async (ctx, request) => {
     if (!identity) {
       return new Response("Unauthorized", { status: 401, headers: corsHeaders });
     }
+    console.log("chatEdit: authenticated user");
 
     const { vaultId, message, activeNoteId } = await request.json();
     if (!vaultId || !message) {
@@ -85,6 +86,7 @@ When the user asks you to create a new note, output:
 - If the notes don't contain relevant information, say so
 - Be concise and factual`;
 
+    console.log("chatEdit: context built, calling OpenRouter");
     // Call OpenRouter API (OpenAI-compatible format) with streaming
     const openRouterResponse = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -110,11 +112,19 @@ When the user asks you to create a new note, output:
     );
 
     if (!openRouterResponse.ok) {
-      const errorText = await openRouterResponse.text();
-      return new Response(`OpenRouter API error: ${errorText}`, {
-        status: 502,
-        headers: corsHeaders,
-      });
+      let errorDetail = "";
+      try {
+        const body = await openRouterResponse.text();
+        const parsed = JSON.parse(body);
+        errorDetail = parsed?.error?.message ?? body;
+      } catch {
+        errorDetail = `HTTP ${openRouterResponse.status}`;
+      }
+      console.error("OpenRouter API error:", openRouterResponse.status, errorDetail);
+      return Response.json(
+        { error: errorDetail },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // Stream the response back (OpenAI SSE format)
