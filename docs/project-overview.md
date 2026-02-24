@@ -54,8 +54,12 @@ The application follows a **client-server architecture** with Convex as the serv
 │  │ .ts      │ │ .ts      │ │ .ts      │            │
 │  └──────────┘ └──────────┘ └──────────┘            │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
-│  │ chat.ts  │ │ http.ts  │ │ schema   │            │
-│  │          │ │          │ │ .ts      │            │
+│  │ chat.ts  │ │chatEdit  │ │onboarding│            │
+│  │          │ │ .ts      │ │ .ts      │            │
+│  └──────────┘ └──────────┘ └──────────┘            │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │userSett- │ │ http.ts  │ │ schema   │            │
+│  │ ings.ts  │ │          │ │ .ts      │            │
 │  └──────────┘ └──────────┘ └──────────┘            │
 │                                                     │
 │  Database: Convex (document-based, indexed)          │
@@ -71,18 +75,22 @@ mrkdwn-me/
 │   ├── components/
 │   │   ├── auth/                 # Authentication UI (Clerk SignIn)
 │   │   ├── backlinks/            # Backlinks panel
-│   │   ├── chat/                 # AI chat panel (Claude RAG)
+│   │   ├── chat/                 # AI chat panel (RAG Q&A + edit mode)
 │   │   ├── command-palette/      # Command palette & quick switcher
 │   │   ├── editor/               # Markdown editor, preview, wiki links, live preview
 │   │   ├── explorer/             # File tree explorer
 │   │   ├── graph/                # D3.js graph visualization
 │   │   ├── layout/               # App layout, sidebar, split panes, tabs
 │   │   ├── search/               # Search panel
-│   │   └── vault/                # Vault selection & management
+│   │   ├── settings/             # Settings dialog (API keys)
+│   │   └── vault/                # Vault selection, management & onboarding
 │   ├── hooks/
-│   │   └── useDownloadVault.ts   # Vault download hook
+│   │   ├── useDownloadVault.ts   # Vault download hook
+│   │   ├── useExportNotePDF.ts   # Single-note PDF export hook
+│   │   └── useOnboardingGenerate.ts # AI onboarding stream hook
 │   ├── utils/
-│   │   └── downloadVault.ts      # ZIP building utility
+│   │   ├── downloadVault.ts      # ZIP building utility
+│   │   └── exportNoteToPDF.ts    # PDF export utility
 │   ├── store/
 │   │   └── workspace.tsx         # Global state (Context + Reducer)
 │   ├── App.tsx                   # Root component with auth gating
@@ -95,9 +103,13 @@ mrkdwn-me/
 │   ├── vaults.ts                 # Vault CRUD operations
 │   ├── folders.ts                # Folder management
 │   ├── notes.ts                  # Note CRUD, search, backlinks
-│   ├── chat.ts                   # AI chat HTTP action (Claude API)
+│   ├── chat.ts                   # AI chat HTTP action (Claude API, Q&A mode)
 │   ├── chatHelpers.ts            # RAG context builder (internal query)
-│   ├── http.ts                   # HTTP routes (/api/chat)
+│   ├── chatEdit.ts               # AI chat HTTP action (OpenRouter, edit mode)
+│   ├── chatEditHelpers.ts        # Edit-mode context builder with active note
+│   ├── onboarding.ts             # AI onboarding wizard HTTP action
+│   ├── userSettings.ts           # User settings (OpenRouter key) CRUD
+│   ├── http.ts                   # HTTP routes (/api/chat, /api/chat-edit, /api/onboarding)
 │   └── _generated/               # Auto-generated API types
 │
 ├── mcp-server/                   # MCP server for AI tool access
@@ -118,15 +130,17 @@ mrkdwn-me/
 
 ## Data Model Overview
 
-The application has three database tables (users are managed by Clerk):
+The application has four database tables (users are managed by Clerk):
 
 - **Vaults** - Top-level containers owned by a user (identified by Clerk `tokenIdentifier`). All notes and folders belong to a vault.
 - **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`. Have an `order` field for sorting.
 - **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content. Have `order`, `createdAt`, and `updatedAt` fields.
+- **User Settings** - Per-user configuration (OpenRouter API key for chat edit mode). Keyed by Clerk `tokenIdentifier`.
 
 ```
 User (Clerk) 1──* Vault 1──* Folder (self-referencing parentId)
                            1──* Note
+             1──1 UserSettings
 ```
 
 ## Key Design Decisions

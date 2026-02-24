@@ -109,8 +109,10 @@ Command Palette Modal
 │   ├── ▸ Toggle Search
 │   ├── ▸ Toggle Chat
 │   ├── ▸ Manage Vaults
+│   ├── ▸ Open Settings
 │   ├── ▸ Download Vault
-│   └── ▸ Toggle Preview/Edit Mode
+│   ├── ▸ Toggle Preview/Edit Mode
+│   └── ▸ Export Note to PDF
 └── (Close on Escape or click outside)
 ```
 
@@ -126,8 +128,10 @@ Command Palette Modal
 | Toggle Search | Show/hide search in right panel | `{ type: "SET_RIGHT_PANEL", panel: "search" }` |
 | Toggle Chat | Show/hide chat in right panel | `{ type: "SET_RIGHT_PANEL", panel: "chat" }` |
 | Manage Vaults | Return to vault selector | `LEAVE_VAULT` |
+| Open Settings | Open the settings dialog (API keys) | Opens `SettingsDialog` (conditional: only shown when `onOpenSettings` prop is provided) |
 | Download Vault | Export current vault as ZIP | Calls `useDownloadVault` hook (conditional: only shown when a vault is active) |
 | Toggle Preview/Edit Mode | Toggle active note tab between preview and edit | `TOGGLE_TAB_MODE` (active pane/tab) |
+| Export Note to PDF | Export the active note as a styled PDF | Calls `useExportNotePDF` hook (conditional: only shown when a note tab is active) |
 
 ### Interaction
 

@@ -41,6 +41,15 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
        └──────────┤ search: content│
     (self-ref     │ search: title │
      parentId)    └──────────────┘
+
+┌────────────────┐
+│ userSettings   │
+│────────────────│
+│ _id            │
+│ userId ────────┼──→ Clerk tokenIdentifier (string)
+│ openRouterKey? │
+│ idx: by_user   │
+└────────────────┘
 ```
 
 ### Tables
@@ -94,6 +103,17 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 **Search Indexes:**
 - `search_content` → `{ searchField: "content", filterFields: ["vaultId"] }` — Full-text search on note content, scoped by vault
 - `search_title` → `{ searchField: "title", filterFields: ["vaultId"] }` — Full-text search on note title, scoped by vault
+
+#### `userSettings`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `_id` | `Id<"userSettings">` | Primary key |
+| `userId` | `v.string()` | Clerk `tokenIdentifier` identifying the user |
+| `openRouterKey` | `v.optional(v.string())` | OpenRouter API key for chat edit mode |
+
+**Indexes:**
+- `by_user` → `["userId"]` — Lookup settings by user
 
 ---
 
@@ -151,7 +171,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 |----------|------|-----------|---------|-------------|
 | `importVault.createVaultWithFolders` | Action | `{ name, settings?, folders }` | `{ vaultId, folderIdMap }` | Orchestrates vault + folder creation server-side. See [Import Vault](./import-vault.md). |
 
-### Chat Operations
+### Chat Operations (Q&A Mode)
 
 **File:** `convex/chat.ts` (httpAction), `convex/chatHelpers.ts` (internalQuery)
 
@@ -160,14 +180,46 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `chat` | httpAction | Streaming AI chat endpoint. Authenticates via `ctx.auth.getUserIdentity()`, builds context from vault notes via `chatHelpers.buildContext`, calls Claude API (`claude-sonnet-4-5-20250929`) with streaming, returns `text/plain; charset=utf-8`. |
 | `chatHelpers.buildContext` | internalQuery | Accepts `{ vaultId, query }`. Searches notes via `search_title` and `search_content` indexes (15 each), merges/deduplicates. Builds two-tier context: top 5 with full content, next 10 title-only, 80K char limit. Falls back to fetching 15 notes by vault index if no search results. |
 
+### Chat Edit Operations (Edit Mode)
+
+**File:** `convex/chatEdit.ts` (httpAction), `convex/chatEditHelpers.ts` (internalQuery)
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `chatEdit` | httpAction | Streaming AI chat with note editing capability. Authenticates via `ctx.auth.getUserIdentity()`, retrieves user's OpenRouter API key, builds context via `chatEditHelpers.buildEditContext` (includes active note), calls OpenRouter API (`anthropic/claude-sonnet-4-20250514`) with streaming. |
+| `chatEditHelpers.buildEditContext` | internalQuery | Accepts `{ vaultId, query, activeNoteId? }`. Includes the active note's full content first (labelled as "ACTIVE NOTE"), then searches remaining notes via dual-index. Same two-tier context and 80K char limit as Q&A mode. |
+
+### User Settings Operations
+
+**File:** `convex/userSettings.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `userSettings.hasOpenRouterKey` | Query | — | `{ hasKey: boolean }` | Check if user has an OpenRouter key configured |
+| `userSettings.saveOpenRouterKey` | Mutation | `{ key }` | — | Save or update OpenRouter API key |
+| `userSettings.deleteOpenRouterKey` | Mutation | — | — | Remove OpenRouter API key |
+| `userSettings.getOpenRouterKey` | Internal Query | `{ userId }` | `string \| null` | Retrieve key (used by `chatEdit` httpAction) |
+
+### Onboarding Operations
+
+**File:** `convex/onboarding.ts` (httpAction)
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `onboarding` | httpAction | AI-powered vault creation. Accepts user's topic/preferences, calls Claude to generate starter notes, streams the response back. |
+
 ### HTTP Routes
 
 **File:** `convex/http.ts`
 
 | Route | Method | Handler | Purpose |
 |-------|--------|---------|---------|
-| `/api/chat` | POST | `chat` | AI chat streaming endpoint |
+| `/api/chat` | POST | `chat` | AI chat streaming endpoint (Q&A mode) |
 | `/api/chat` | OPTIONS | `chat` | CORS preflight handling |
+| `/api/chat-edit` | POST | `chatEdit` | AI chat streaming endpoint (edit mode, requires OpenRouter key) |
+| `/api/chat-edit` | OPTIONS | `chatEdit` | CORS preflight handling |
+| `/api/onboarding` | POST | `onboarding` | AI onboarding vault generation |
+| `/api/onboarding` | OPTIONS | `onboarding` | CORS preflight handling |
 
 ---
 
