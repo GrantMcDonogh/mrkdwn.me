@@ -213,10 +213,10 @@ export default function FileExplorer() {
 
     const childFolders = folders
       .filter((f) => f.parentId === parentId)
-      .sort((a, b) => a.order - b.order);
+      .sort((a, b) => a.name.localeCompare(b.name));
     const childNotes = notes
       .filter((n) => n.folderId === parentId)
-      .sort((a, b) => a.order - b.order);
+      .sort((a, b) => a.title.localeCompare(b.title));
 
     return (
       <>
