@@ -43,13 +43,19 @@
       "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm run build 2>&1)",
       "Bash(head:*)",
       "Bash(npm run build:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm pack --dry-run 2>&1)",
+      "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm publish 2>&1)",
+      "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm login 2>&1)",
+      "Bash(npm whoami:*)"
     ]
   },
   "mcpServers": {
     "mrkdwn": {
       "command": "node",
-      "args": ["D:/Dev/mrkdwn.me/mcp-server/dist/index.js"],
+      "args": [
+        "D:/Dev/mrkdwn.me/mcp-server/dist/index.js"
+      ],
       "env": {
         "MRKDWN_API_URL": "https://beaming-panda-407.convex.site",
         "MRKDWN_API_KEY": "mk_fd09b076f6a71b8c0bd13d8b33893a0696f6f30b7fa8df08d4efefd5720bdab4"
