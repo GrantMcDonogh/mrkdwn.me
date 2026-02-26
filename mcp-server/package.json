@@ -2,11 +2,32 @@
   "name": "mrkdwn-mcp-server",
   "version": "0.1.0",
   "type": "module",
-  "private": true,
+  "description": "MCP server for mrkdwn.me — read, create, search, and manage your vault notes from Claude Code or Claude Desktop",
+  "bin": {
+    "mrkdwn-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "obsidian",
+    "markdown",
+    "knowledge-base",
+    "claude"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GrantBirki/mrkdwn.me",
+    "directory": "mcp-server"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
