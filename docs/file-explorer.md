@@ -138,8 +138,8 @@ File Explorer Panel
 | **Create Folder** | Click `FolderPlus` button on header or folder hover | Opens inline creation form with default name "New Folder". On Enter or blur, calls `folders.create`. If inside a folder, auto-expands it. |
 | **Upload .md Files** | Click `Upload` button on header or folder hover | Opens native file picker (`.md` only, multi-select). Filters to `.md` files, reads content, batches via `batchNotes()`, and calls `notes.importBatch` for each batch. Header shows "Uploading…" spinner during upload. When triggered from a folder's hover button, notes are created inside that folder; from the header, notes go to the vault root. |
 | **Rename** | Double-click item name | Switches to inline edit mode; save on Enter or blur. Escape cancels. |
-| **Delete Note** | Click `Trash2` icon (visible on hover) | Calls `notes.remove` mutation |
-| **Delete Folder** | Click `Trash2` icon (visible on hover) | Calls `folders.remove` mutation; children promoted |
+| **Delete Note** | Click `Trash2` icon (visible on hover) | Shows confirmation dialog; calls `notes.remove` mutation |
+| **Delete Folder** | Click `Trash2` icon (visible on hover) | Shows confirmation dialog; calls `folders.remove` mutation; children promoted |
 | **Move (Drag & Drop)** | Drag item onto a folder or root area | Calls `notes.move({ id, folderId })` or `folders.move({ id, parentId })`. Dropping on empty space moves to root. |
 | **Upload via Drag & Drop** | Drag `.md` files from OS file manager onto the explorer | Detects external file drops (checks `e.dataTransfer.files`), filters to `.md` files, and uploads them via `prepareUploadNotes()` + `batchNotes()` + `notes.importBatch`. Dropping onto a folder uploads into that folder; dropping on the root area uploads to the vault root. Non-`.md` files are silently ignored. |
 
