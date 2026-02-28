@@ -132,6 +132,25 @@ describe("buildFolderPaths", () => {
     // so the child resolves to just its own name
     expect(result.get("f1")).toBe("Child");
   });
+
+  it("handles circular parent references without stack overflow", () => {
+    const folders: Folder[] = [
+      { _id: "f1", name: "A", parentId: "f2" },
+      { _id: "f2", name: "B", parentId: "f1" },
+    ];
+    const result = buildFolderPaths(folders);
+    // Should not throw — cycle is broken gracefully
+    expect(result.has("f1")).toBe(true);
+    expect(result.has("f2")).toBe(true);
+  });
+
+  it("handles self-referencing folder without stack overflow", () => {
+    const folders: Folder[] = [
+      { _id: "f1", name: "Self", parentId: "f1" },
+    ];
+    const result = buildFolderPaths(folders);
+    expect(result.get("f1")).toBe("Self");
+  });
 });
 
 // ─── buildVaultZip — file structure ─────────────────────────────

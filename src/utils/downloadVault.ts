@@ -24,14 +24,35 @@ export function buildFolderPaths(folders: Folder[]): Map<string, string> {
 
   function resolve(id: string): string {
     if (pathCache.has(id)) return pathCache.get(id)!;
-    const folder = map.get(id);
-    if (!folder) return "";
-    const parentPath = folder.parentId ? resolve(folder.parentId) : "";
-    const path = parentPath
-      ? `${parentPath}/${sanitizeName(folder.name)}`
-      : sanitizeName(folder.name);
-    pathCache.set(id, path);
-    return path;
+
+    // Walk up the parent chain iteratively, collecting ancestors
+    const chain: Folder[] = [];
+    const visited = new Set<string>();
+    let currentId: string | undefined = id;
+
+    while (currentId) {
+      if (pathCache.has(currentId)) break;
+      if (visited.has(currentId)) break; // cycle detected
+      visited.add(currentId);
+      const folder = map.get(currentId);
+      if (!folder) break;
+      chain.push(folder);
+      currentId = folder.parentId;
+    }
+
+    // Resolve chain from root to leaf
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const folder = chain[i]!;
+      const parentPath = folder.parentId
+        ? (pathCache.get(folder.parentId) ?? "")
+        : "";
+      const path = parentPath
+        ? `${parentPath}/${sanitizeName(folder.name)}`
+        : sanitizeName(folder.name);
+      pathCache.set(folder._id, path);
+    }
+
+    return pathCache.get(id) ?? "";
   }
 
   for (const f of folders) resolve(f._id);
