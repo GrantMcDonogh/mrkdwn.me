@@ -127,7 +127,11 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
       onDoubleClick={onSwitchToEdit}
     >
       <div className="px-6 py-4 max-w-none">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={components}
+          urlTransform={(url) => url}
+        >
           {processedContent}
         </ReactMarkdown>
       </div>
