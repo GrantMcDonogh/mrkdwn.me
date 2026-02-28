@@ -3,7 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { X, Key, ExternalLink } from "lucide-react";
+import { X, Key, ExternalLink, BookOpen } from "lucide-react";
 import ApiKeyManager from "./ApiKeyManager";
 
 interface Props {
@@ -189,6 +189,16 @@ export default function SettingsDialog({ onClose, vaultId }: Props) {
           {vaultId && (
             <div className="border-t border-obsidian-border pt-4">
               <ApiKeyManager vaultId={vaultId} />
+              <a
+                href="/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-3 text-xs text-obsidian-accent hover:underline"
+              >
+                <BookOpen size={12} />
+                View API Documentation
+                <ExternalLink size={10} />
+              </a>
             </div>
           )}
         </div>

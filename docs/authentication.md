@@ -39,7 +39,7 @@ export default http;
 ```
 
 - There are no auth-related HTTP routes. OAuth callbacks are handled entirely by Clerk's hosted infrastructure.
-- The only HTTP routes are for the `/api/chat` AI streaming endpoint.
+- HTTP routes include AI streaming endpoints and the REST API v1 (see [database-and-api.md](./database-and-api.md)).
 
 ### Frontend Integration
 
@@ -68,7 +68,7 @@ export default http;
 **`src/App.tsx`**
 
 ```tsx
-export default function App() {
+function AuthenticatedApp() {
   const { isAuthenticated, isLoading } = useConvexAuth();
 
   if (isLoading) {
@@ -89,8 +89,20 @@ export default function App() {
     </WorkspaceProvider>
   );
 }
+
+export default function App() {
+  const { pathname } = useLocation();
+
+  if (pathname === "/docs") {
+    return <DocsPage />;
+  }
+
+  return <AuthenticatedApp />;
+}
 ```
 
+- The top-level `App` checks the URL path first. The `/docs` route renders the public API documentation page without any auth.
+- Auth logic is extracted into `AuthenticatedApp` to preserve React hook ordering rules (hooks can't be called conditionally).
 - Uses `useConvexAuth()` to check authentication status.
 - Shows an inline loading indicator while the session is being verified.
 - Renders `<AuthPage />` for unauthenticated users.

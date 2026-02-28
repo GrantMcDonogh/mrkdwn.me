@@ -77,6 +77,7 @@ mrkdwn-me/
 │   │   ├── backlinks/            # Backlinks panel
 │   │   ├── chat/                 # AI chat panel (RAG Q&A + edit mode)
 │   │   ├── command-palette/      # Command palette & quick switcher
+│   │   ├── docs/                 # Public API documentation page
 │   │   ├── editor/               # Markdown editor, preview, wiki links, live preview
 │   │   ├── explorer/             # File tree explorer
 │   │   ├── graph/                # D3.js graph visualization
@@ -93,7 +94,7 @@ mrkdwn-me/
 │   │   └── exportNoteToPDF.ts    # PDF export utility
 │   ├── store/
 │   │   └── workspace.tsx         # Global state (Context + Reducer)
-│   ├── App.tsx                   # Root component with auth gating
+│   ├── App.tsx                   # Root component with auth gating + /docs route
 │   ├── main.tsx                  # Entry point with providers
 │   └── index.css                 # Global styles & Tailwind theme
 │

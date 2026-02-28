@@ -331,6 +331,8 @@ All endpoints use the `apiKeyAction` wrapper which handles OPTIONS preflight, ex
 
 Response format: `{ ok: true, data: ... }` on success, `{ ok: false, error: "..." }` on error.
 
+A public-facing API documentation page is available at `/docs` (rendered by `src/components/docs/DocsPage.tsx`). This page is accessible without authentication and documents all 16 REST API v1 endpoints with parameter tables, curl examples, and JSON response examples. A link to the docs page is shown in the Settings dialog next to the API key manager.
+
 ---
 
 ## Authorization Patterns
