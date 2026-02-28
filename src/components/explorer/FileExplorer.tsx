@@ -190,9 +190,28 @@ export default function FileExplorer() {
     try {
       const data = JSON.parse(e.dataTransfer.getData("text/plain"));
       if (data.type === "folder") {
+        let parentId = targetFolderId;
+
+        // Prevent moving a folder into itself or its own descendants — move to root instead
+        if (parentId && folders) {
+          let cur: Id<"folders"> | undefined = parentId;
+          while (cur) {
+            if (cur === data.id) {
+              parentId = undefined;
+              break;
+            }
+            const parent = folders.find((f) => f._id === cur);
+            cur = parent?.parentId;
+          }
+        }
+
+        // Skip no-op moves (already in the target location)
+        const folder = folders?.find((f) => f._id === data.id);
+        if (folder && folder.parentId === parentId) return;
+
         await moveFolder({
           id: data.id as Id<"folders">,
-          parentId: targetFolderId,
+          parentId,
         });
       } else {
         await moveNote({
