@@ -140,7 +140,7 @@ File Explorer Panel
 | **Rename** | Double-click item name | Switches to inline edit mode; save on Enter or blur. Escape cancels. |
 | **Delete Note** | Click `Trash2` icon (visible on hover) | Shows confirmation dialog; calls `notes.remove` mutation |
 | **Delete Folder** | Click `Trash2` icon (visible on hover) | Shows confirmation dialog; calls `folders.remove` mutation; children promoted |
-| **Move (Drag & Drop)** | Drag item onto a folder or root area | Calls `notes.move({ id, folderId })` or `folders.move({ id, parentId })`. Dropping on empty space moves to root. |
+| **Move (Drag & Drop)** | Drag item onto a folder or root area | Calls `notes.move({ id, folderId })` or `folders.move({ id, parentId })`. Dropping on empty space moves to root. Folders cannot be dropped into themselves or their own descendants — such drops are redirected to root. No-op moves (already at target) are skipped. |
 | **Upload via Drag & Drop** | Drag `.md` files from OS file manager onto the explorer | Detects external file drops (checks `e.dataTransfer.files`), filters to `.md` files, and uploads them via `prepareUploadNotes()` + `batchNotes()` + `notes.importBatch`. Dropping onto a folder uploads into that folder; dropping on the root area uploads to the vault root. Non-`.md` files are silently ignored. |
 
 ### Inline Editing
@@ -181,6 +181,8 @@ The `handleDrop` function handles two types of drops:
 - Dropping a note onto a folder calls `notes.move({ id, folderId })`.
 - Dropping a folder onto another folder calls `folders.move({ id, parentId })`.
 - Dropping on the root area (empty space outside folders) moves the item to the root level by passing `undefined` as the parent/folder.
+- **Cycle prevention:** Before moving a folder, the code walks up the parent chain from the drop target. If the dragged folder is found as an ancestor, the move is redirected to root (`undefined`) to prevent self-referencing or circular parent chains that would orphan the folder from the tree.
+- **No-op detection:** If a folder is already at the target location (same `parentId`), the drop is silently ignored.
 
 ### Visual Design
 
