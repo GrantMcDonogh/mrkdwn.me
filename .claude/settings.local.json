@@ -47,7 +47,9 @@
       "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm pack --dry-run 2>&1)",
       "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm publish 2>&1)",
       "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm login 2>&1)",
-      "Bash(npm whoami:*)"
+      "Bash(npm whoami:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npm run:*)"
     ]
   },
   "mcpServers": {
