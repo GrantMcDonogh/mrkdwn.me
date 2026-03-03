@@ -142,6 +142,14 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
     [navigateToNote, clearHoverTimeout, clearDismissTimeout]
   );
 
+  const hoveredNoteContent = useMemo(() => {
+    if (!hoverState || !allNotes) return null;
+    const target = allNotes.find(
+      (n) => n.title.toLowerCase() === hoverState.title.toLowerCase()
+    );
+    return target ? target.content : null;
+  }, [hoverState, allNotes]);
+
   if (note === undefined) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -157,14 +165,6 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
       </div>
     );
   }
-
-  const hoveredNoteContent = useMemo(() => {
-    if (!hoverState || !allNotes) return null;
-    const target = allNotes.find(
-      (n) => n.title.toLowerCase() === hoverState.title.toLowerCase()
-    );
-    return target ? target.content : null;
-  }, [hoverState, allNotes]);
 
   return (
     <div
