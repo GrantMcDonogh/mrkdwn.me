@@ -79,7 +79,7 @@ The editor is configured with the following CodeMirror extensions:
 | Search keymap | `@codemirror/search` | Find/replace functionality |
 | Autocomplete | `@codemirror/autocomplete` | Wiki link completion |
 | Wiki link plugin | `wikiLinks.ts` | Renders and navigates wiki links |
-| Wiki link hover preview | `wikiLinks.ts` | Shows popup with linked note content on hover |
+| Wiki link hover preview | `wikiLinks.ts` | ViewPlugin: shows fixed-position popup at mouse cursor on wiki link hover |
 | Live preview plugin | `livePreview.ts` | Inline Markdown formatting preview |
 | Update listener | `@codemirror/view` | Triggers auto-save on changes |
 

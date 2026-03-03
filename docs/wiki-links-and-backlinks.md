@@ -70,16 +70,15 @@ Hovering over a wiki link shows a popup with rendered markdown content of the li
 
 **File:** `src/components/editor/wikiLinks.ts`
 
-Uses CodeMirror's built-in `hoverTooltip` from `@codemirror/view`. The tooltip source function:
+Uses a custom `ViewPlugin` that manages its own `position: fixed` DOM element appended to `document.body`, bypassing CodeMirror's built-in tooltip system for full control over positioning:
 
-1. Receives a document position and scans the line for `[[...]]` matches.
-2. Checks if the cursor position falls within a wiki link match.
-3. Parses the title (handling `|alias` and `#heading` — same logic as `buildDecorations`).
-4. Calls the injected `getNoteContent(title)` callback to retrieve the linked note's content.
-5. Truncates content to 1500 characters for performance.
-6. Strips wiki links to plain text using `preprocessForPDF()` from `src/utils/exportNoteToPDF.ts`.
-7. Renders HTML synchronously via `marked.parse()` (avoids React mounting complexity inside CodeMirror's imperative DOM).
-8. Returns a `Tooltip` with `above: true` positioning.
+1. A `mousemove` listener on the editor DOM calls `posAtCoords()` to map the mouse position to a document offset, then scans the line for `[[...]]` matches.
+2. If the cursor is over a wiki link, a 300ms timer starts. When it fires, the popup is created and appended to `document.body`.
+3. The linked note's content is retrieved via the injected `getNoteContent(title)` callback.
+4. Content is truncated to 1500 characters, wiki links are stripped to plain text via `preprocessForPDF()`, and HTML is rendered synchronously via `marked.parse()`.
+5. The popup is positioned at the mouse cursor using `positionPopup()` with smart viewport edge detection (see Positioning below).
+6. On `mouseleave` from the editor, a 200ms dismiss timer starts. The popup's own `mouseenter` cancels the dismiss; `mouseleave` from the popup triggers dismissal.
+7. On plugin `destroy()`, all timers are cleared and the popup is removed.
 
 The content provider is injected by `MarkdownEditor` via `setNoteContentProvider()`, following the same module-level callback pattern as `setWikiLinkNavigator` and `setNoteListProvider`.
 
@@ -89,11 +88,22 @@ The content provider is injected by `MarkdownEditor` via `setNoteContentProvider
 
 Uses React state and mouse event handlers on the wiki link `<a>` elements:
 
-1. `onMouseEnter` starts a 300ms timeout, then sets `hoverState` with the link title and anchor `DOMRect`.
+1. `onMouseEnter` captures `clientX`/`clientY` and starts a 300ms timeout, then sets `hoverState` with the link title and mouse coordinates.
 2. `onMouseLeave` starts a 200ms dismiss timeout (allows the user to move their mouse into the popup).
-3. The `LinkPreviewPopup` component renders conditionally when `hoverState` is set.
-4. The popup's own `onMouseEnter` cancels the dismiss timeout; `onMouseLeave` dismisses the popup.
-5. Content is rendered via `ReactMarkdown` + `remarkGfm` for consistency with the main preview.
+3. The `LinkPreviewPopup` component renders conditionally via `createPortal` to `document.body` when `hoverState` is set, using `position: fixed`.
+4. A callback ref on the popup element calls `positionPopup()` on mount for accurate edge detection based on actual rendered size.
+5. The popup's own `onMouseEnter` cancels the dismiss timeout; `onMouseLeave` dismisses the popup.
+6. Content is rendered via `ReactMarkdown` + `remarkGfm` for consistency with the main preview.
+
+### Positioning
+
+Both modes share the `positionPopup()` function (exported from `wikiLinks.ts`) for smart viewport-aware placement:
+
+- **Default**: Popup appears 12px below and to the right of the mouse cursor.
+- **Right edge**: If the popup would overflow the right edge of the viewport, it flips to the left of the cursor.
+- **Bottom edge**: If the popup would overflow the bottom, it flips above the cursor.
+- **Clamping**: The popup is always kept at least 8px from any viewport edge.
+- **Measurement**: The actual rendered size of the popup (`getBoundingClientRect()`) is used for accurate edge detection, not the max CSS dimensions.
 
 ### Shared Behavior
 
@@ -107,6 +117,7 @@ Uses React state and mouse event handlers on the wiki link `<a>` elements:
 | Missing note | Shows "Note not found" message |
 | Empty note | Shows "Empty note" message |
 | Click passthrough | Clicking a wiki link still navigates (unchanged behavior) |
+| Rendering | Editor: `position: fixed` DOM on `document.body`. Preview: React portal to `document.body` |
 
 ### Styling
 
@@ -115,7 +126,6 @@ Popup styles are defined in `src/index.css` under `.link-preview-popup`:
 - Dark background (`var(--color-obsidian-bg-secondary)`) with border and box shadow
 - Max dimensions: 450px wide, 320px tall with scrollable overflow
 - Smaller heading sizes inside the popup (h1: 1.4em, h2: 1.2em, h3/h4: 1.05em)
-- CodeMirror tooltip wrapper override: `.cm-tooltip-hover:has(.link-preview-popup)` clears default tooltip styling
 
 ## Backlinks
 
