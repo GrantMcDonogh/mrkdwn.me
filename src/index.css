@@ -144,6 +144,47 @@ body {
   color: white !important;
 }
 
+/* Link preview popup */
+.link-preview-popup {
+  background: var(--color-obsidian-bg-secondary);
+  border: 1px solid var(--color-obsidian-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: 450px;
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.link-preview-content {
+  padding: 12px 16px;
+  overflow-y: auto;
+  max-height: 304px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Smaller headings inside popup */
+.link-preview-content h1 { font-size: 1.4em; margin: 0.4em 0 0.3em; }
+.link-preview-content h2 { font-size: 1.2em; margin: 0.3em 0 0.2em; }
+.link-preview-content h3,
+.link-preview-content h4 { font-size: 1.05em; margin: 0.2em 0 0.1em; }
+
+.link-preview-content > :first-child { margin-top: 0; }
+
+.link-preview-empty {
+  padding: 12px 16px;
+  color: var(--color-obsidian-text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Override CodeMirror tooltip wrapper when it contains our popup */
+.cm-tooltip-hover:has(.link-preview-popup) {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
 /* Markdown Preview */
 .markdown-preview {
   font-size: 16px;

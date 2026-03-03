@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
 import type { Id } from "../../../convex/_generated/dataModel";
+import LinkPreviewPopup from "./LinkPreviewPopup";
 
 interface Props {
   noteId: Id<"notes">;
@@ -64,6 +65,28 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
     [allNotes, dispatch]
   );
 
+  const [hoverState, setHoverState] = useState<{
+    title: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearHoverTimeout = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearDismissTimeout = useCallback(() => {
+    if (dismissTimeoutRef.current) {
+      clearTimeout(dismissTimeoutRef.current);
+      dismissTimeoutRef.current = null;
+    }
+  }, []);
+
   const processedContent = useMemo(
     () => (note?.content ? preprocessContent(note.content) : ""),
     [note?.content]
@@ -81,6 +104,20 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
                 e.preventDefault();
                 e.stopPropagation();
                 navigateToNote(title);
+              }}
+              onMouseEnter={(e) => {
+                clearDismissTimeout();
+                clearHoverTimeout();
+                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                hoverTimeoutRef.current = setTimeout(() => {
+                  setHoverState({ title, anchorRect: rect });
+                }, 300);
+              }}
+              onMouseLeave={() => {
+                clearHoverTimeout();
+                dismissTimeoutRef.current = setTimeout(() => {
+                  setHoverState(null);
+                }, 200);
               }}
             >
               {children}
@@ -102,7 +139,7 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
         <input {...props} checked={checked} disabled type="checkbox" />
       ),
     }),
-    [navigateToNote]
+    [navigateToNote, clearHoverTimeout, clearDismissTimeout]
   );
 
   if (note === undefined) {
@@ -121,9 +158,18 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
     );
   }
 
+  const hoveredNoteContent = useMemo(() => {
+    if (!hoverState || !allNotes) return null;
+    const target = allNotes.find(
+      (n) => n.title.toLowerCase() === hoverState.title.toLowerCase()
+    );
+    return target ? target.content : null;
+  }, [hoverState, allNotes]);
+
   return (
     <div
-      className="markdown-preview flex-1 overflow-auto"
+      ref={containerRef}
+      className="markdown-preview flex-1 overflow-auto relative"
       onDoubleClick={onSwitchToEdit}
     >
       <div className="px-6 py-4 max-w-none">
@@ -135,6 +181,18 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
           {processedContent}
         </ReactMarkdown>
       </div>
+      {hoverState && containerRef.current && (
+        <LinkPreviewPopup
+          title={hoverState.title}
+          content={hoveredNoteContent === null ? null : (hoveredNoteContent ?? null)}
+          anchorRect={hoverState.anchorRect}
+          containerRect={containerRef.current.getBoundingClientRect()}
+          onMouseEnter={clearDismissTimeout}
+          onMouseLeave={() => {
+            setHoverState(null);
+          }}
+        />
+      )}
     </div>
   );
 }

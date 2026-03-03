@@ -14,8 +14,10 @@ import { livePreviewPlugin } from "./livePreview";
 import {
   wikiLinkPlugin,
   wikiLinkCompletion,
+  wikiLinkHoverPreview,
   setWikiLinkNavigator,
   setNoteListProvider,
+  setNoteContentProvider,
 } from "./wikiLinks";
 import { useWorkspace } from "../../store/workspace";
 
@@ -64,6 +66,13 @@ export default function MarkdownEditor({ noteId }: Props) {
       }
     });
     setNoteListProvider(() => allNotes ?? []);
+    setNoteContentProvider((title: string) => {
+      if (!allNotes) return null;
+      const target = allNotes.find(
+        (n) => n.title.toLowerCase() === title.toLowerCase()
+      );
+      return target ? target.content : null;
+    });
   }, [allNotes, dispatch]);
 
   // Create editor — depends on noteId and whether note data has loaded
@@ -86,6 +95,7 @@ export default function MarkdownEditor({ noteId }: Props) {
         oneDark,
         livePreviewPlugin,
         wikiLinkPlugin,
+        wikiLinkHoverPreview,
         autocompletion({ override: [wikiLinkCompletion] }),
         keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
         EditorView.updateListener.of((update) => {
