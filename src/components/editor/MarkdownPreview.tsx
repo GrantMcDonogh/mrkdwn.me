@@ -103,6 +103,9 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                clearHoverTimeout();
+                clearDismissTimeout();
+                setHoverState(null);
                 navigateToNote(title);
               }}
               onMouseEnter={(e) => {

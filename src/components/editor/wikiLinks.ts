@@ -44,6 +44,7 @@ class WikiLinkWidget extends WidgetType {
     span.textContent = this.display;
     span.addEventListener("click", (e) => {
       e.preventDefault();
+      dismissPopup();
       if (navigateToNote) navigateToNote(this.title);
     });
     return span;
