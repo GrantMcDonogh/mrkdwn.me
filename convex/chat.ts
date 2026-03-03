@@ -65,7 +65,7 @@ export const chat = httpAction(async (ctx, request) => {
       stream: true,
       system:
         "You are a helpful assistant that answers questions based on the user's vault notes. " +
-        "Answer ONLY from the provided notes. Cite note titles when referencing content. " +
+        "Answer ONLY from the provided notes. Use [[Note Title]] wiki link syntax when referencing note titles. " +
         'If the notes don\'t contain relevant information, say "I don\'t have enough information in your notes to answer that." ' +
         "Use markdown formatting. Be concise and factual. Note any discrepancies between notes.",
       messages: [

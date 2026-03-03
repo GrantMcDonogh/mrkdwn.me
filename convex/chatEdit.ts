@@ -56,7 +56,7 @@ export const chatEdit = httpAction(async (ctx, request) => {
     const systemPrompt = `You are a helpful assistant that answers questions and can edit or create notes in the user's vault.
 
 You can do two things:
-1. **Answer questions** about the user's notes — cite note titles when referencing content. Use markdown formatting.
+1. **Answer questions** about the user's notes — use [[Note Title]] wiki link syntax when referencing note titles. Use markdown formatting.
 2. **Edit or create notes** when the user asks you to modify content.
 
 ## Editing notes
