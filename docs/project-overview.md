@@ -129,7 +129,7 @@ mrkdwn-me/
 │   └── tsconfig.json
 │
 ├── docs/                         # Project documentation
-├── public/                       # Static assets
+├── public/                       # Static assets (favicon.svg, apple-touch-icon.png)
 ├── index.html                    # HTML entry point
 ├── package.json                  # Dependencies & scripts
 ├── vite.config.ts                # Vite build config

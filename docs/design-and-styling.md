@@ -499,6 +499,15 @@ All icons come from **lucide-react** (v0.574.0). They are used as inline React c
 
 Icon color follows the parent text color via `className="text-obsidian-text-muted"` or `"text-obsidian-accent"`.
 
+### Favicon & Touch Icons
+
+| File | Purpose |
+|------|---------|
+| `public/favicon.svg` | Browser tab icon (SVG, 32×32 viewBox) |
+| `public/apple-touch-icon.png` | iOS/iPadOS home screen icon (180×180 PNG) |
+
+Both are referenced in `index.html` via `<link>` tags. The apple-touch-icon is required because iOS ignores SVG favicons when saving a page to the home screen.
+
 ---
 
 ## Tailwind Utility Patterns Reference
