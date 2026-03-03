@@ -141,3 +141,7 @@ Popup appears at the mouse cursor with smart viewport edge detection — flips d
 ### Markdown Rendering in Chat Messages — Mar 3, 2026
 AI chat responses are now rendered as formatted markdown (headings, bold, lists, code blocks) instead of plain text.
 `[[Wiki links]]` in responses are clickable and navigate to the referenced note. Both chat modes instruct the AI to use wiki link syntax when citing notes.
+
+### Concise Chat Responses — Mar 3, 2026
+AI chat responses are now brief (1-3 sentences) with `[[wiki links]]` to source notes, letting users click through for details.
+Longer responses are only produced when the user explicitly asks for detail.
