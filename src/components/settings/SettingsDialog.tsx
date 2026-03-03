@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { X, Key, ExternalLink, BookOpen } from "lucide-react";
 import ApiKeyManager from "./ApiKeyManager";
+import { useVaultRole } from "../../hooks/useVaultRole";
 
 interface Props {
   onClose: () => void;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function SettingsDialog({ onClose, vaultId }: Props) {
+  const { canManage } = useVaultRole();
   const keyStatus = useQuery(api.userSettings.hasOpenRouterKey);
   const saveKey = useMutation(api.userSettings.saveOpenRouterKey);
   const deleteKey = useMutation(api.userSettings.deleteOpenRouterKey);
@@ -186,7 +188,7 @@ export default function SettingsDialog({ onClose, vaultId }: Props) {
             </a>
           </div>
 
-          {vaultId && (
+          {vaultId && canManage && (
             <div className="border-t border-obsidian-border pt-4">
               <ApiKeyManager vaultId={vaultId} />
               <a

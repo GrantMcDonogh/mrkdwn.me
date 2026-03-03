@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
+import { useVaultRole } from "../../hooks/useVaultRole";
 import { useDownloadVault } from "../../hooks/useDownloadVault";
 import { useExportNotePDF } from "../../hooks/useExportNotePDF";
 
@@ -13,10 +14,12 @@ interface Command {
 interface Props {
   onClose: () => void;
   onOpenSettings?: () => void;
+  onOpenShare?: () => void;
 }
 
-export default function CommandPalette({ onClose, onOpenSettings }: Props) {
+export default function CommandPalette({ onClose, onOpenSettings, onOpenShare }: Props) {
   const [state, dispatch] = useWorkspace();
+  const { canEditNotes, canShareVault } = useVaultRole();
   const currentVault = useQuery(
     api.vaults.get,
     state.vaultId ? { id: state.vaultId } : "skip"
@@ -63,6 +66,9 @@ export default function CommandPalette({ onClose, onOpenSettings }: Props) {
     ...(onOpenSettings
       ? [{ name: "Open Settings", action: () => onOpenSettings() }]
       : []),
+    ...(canShareVault && onOpenShare
+      ? [{ name: "Share Vault", action: () => onOpenShare() }]
+      : []),
     ...(state.vaultId && currentVault
       ? [
           {
@@ -71,24 +77,28 @@ export default function CommandPalette({ onClose, onOpenSettings }: Props) {
           },
         ]
       : []),
-    {
-      name: "Toggle Preview/Edit Mode",
-      action: () => {
-        const activePane = state.panes.find(
-          (p) => p.id === state.activePaneId
-        );
-        const activeTab = activePane?.tabs.find(
-          (t) => t.id === activePane.activeTabId
-        );
-        if (activeTab?.type === "note") {
-          dispatch({
-            type: "TOGGLE_TAB_MODE",
-            paneId: activePane!.id,
-            tabId: activeTab.id,
-          });
-        }
-      },
-    },
+    ...(canEditNotes
+      ? [
+          {
+            name: "Toggle Preview/Edit Mode",
+            action: () => {
+              const activePane = state.panes.find(
+                (p) => p.id === state.activePaneId
+              );
+              const activeTab = activePane?.tabs.find(
+                (t) => t.id === activePane.activeTabId
+              );
+              if (activeTab?.type === "note") {
+                dispatch({
+                  type: "TOGGLE_TAB_MODE",
+                  paneId: activePane!.id,
+                  tabId: activeTab.id,
+                });
+              }
+            },
+          },
+        ]
+      : []),
     ...(() => {
       const activePane = state.panes.find(
         (p) => p.id === state.activePaneId

@@ -1,16 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-
-async function verifyVaultOwnership(
-  ctx: { db: { get: (id: any) => Promise<any> } },
-  vaultId: any,
-  userId: any
-) {
-  const vault = await ctx.db.get(vaultId);
-  if (!vault || vault.userId !== userId) {
-    throw new Error("Vault not found");
-  }
-}
+import { verifyVaultAccess } from "./auth";
 
 export const importBatch = mutation({
   args: {
@@ -28,10 +18,11 @@ export const importBatch = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     if (args.notes.length > 0) {
-      await verifyVaultOwnership(
-        ctx,
+      await verifyVaultAccess(
+        ctx.db,
         args.notes[0]!.vaultId,
-        identity.tokenIdentifier
+        identity.tokenIdentifier,
+        "editor"
       );
     }
     const now = Date.now();
@@ -55,7 +46,7 @@ export const list = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    await verifyVaultOwnership(ctx, args.vaultId, userId);
+    await verifyVaultAccess(ctx.db, args.vaultId, userId, "viewer");
     return ctx.db
       .query("notes")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
@@ -71,7 +62,7 @@ export const get = query({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "viewer");
     return note;
   },
 });
@@ -86,7 +77,7 @@ export const create = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    await verifyVaultOwnership(ctx, args.vaultId, userId);
+    await verifyVaultAccess(ctx.db, args.vaultId, userId, "editor");
     const siblings = await ctx.db
       .query("notes")
       .withIndex("by_folder", (q) =>
@@ -114,7 +105,7 @@ export const update = mutation({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
     await ctx.db.patch(args.id, { content: args.content, updatedAt: Date.now() });
   },
 });
@@ -127,7 +118,7 @@ export const rename = mutation({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
 
     const oldTitle = note.title;
     const newTitle = args.title;
@@ -173,7 +164,7 @@ export const move = mutation({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
     await ctx.db.patch(args.id, { folderId: args.folderId });
   },
 });
@@ -186,7 +177,7 @@ export const remove = mutation({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
     await ctx.db.delete(args.id);
   },
 });
@@ -197,7 +188,7 @@ export const search = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    await verifyVaultOwnership(ctx, args.vaultId, userId);
+    await verifyVaultAccess(ctx.db, args.vaultId, userId, "viewer");
 
     if (!args.query.trim()) return [];
 
@@ -236,7 +227,7 @@ export const getBacklinks = query({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.noteId);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "viewer");
 
     const allNotes = await ctx.db
       .query("notes")
@@ -278,7 +269,7 @@ export const getUnlinkedMentions = query({
     const userId = identity.tokenIdentifier;
     const note = await ctx.db.get(args.noteId);
     if (!note) throw new Error("Note not found");
-    await verifyVaultOwnership(ctx, note.vaultId, userId);
+    await verifyVaultAccess(ctx.db, note.vaultId, userId, "viewer");
 
     if (!note.title) return [];
 

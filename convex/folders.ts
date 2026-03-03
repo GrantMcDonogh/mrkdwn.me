@@ -1,17 +1,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-
-async function verifyVaultOwnership(
-  ctx: { db: { get: (id: any) => Promise<any> } },
-  vaultId: any,
-  userId: any
-) {
-  const vault = await ctx.db.get(vaultId);
-  if (!vault || vault.userId !== userId) {
-    throw new Error("Vault not found");
-  }
-}
+import { verifyVaultAccess } from "./auth";
 
 export const importBatch = internalMutation({
   args: {
@@ -51,7 +41,7 @@ export const list = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    await verifyVaultOwnership(ctx, args.vaultId, userId);
+    await verifyVaultAccess(ctx.db, args.vaultId, userId, "viewer");
     return ctx.db
       .query("folders")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
@@ -69,7 +59,7 @@ export const create = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    await verifyVaultOwnership(ctx, args.vaultId, userId);
+    await verifyVaultAccess(ctx.db, args.vaultId, userId, "editor");
     const siblings = await ctx.db
       .query("folders")
       .withIndex("by_parent", (q) =>
@@ -93,7 +83,7 @@ export const rename = mutation({
     const userId = identity.tokenIdentifier;
     const folder = await ctx.db.get(args.id);
     if (!folder) throw new Error("Folder not found");
-    await verifyVaultOwnership(ctx, folder.vaultId, userId);
+    await verifyVaultAccess(ctx.db, folder.vaultId, userId, "editor");
     await ctx.db.patch(args.id, { name: args.name });
   },
 });
@@ -106,7 +96,7 @@ export const move = mutation({
     const userId = identity.tokenIdentifier;
     const folder = await ctx.db.get(args.id);
     if (!folder) throw new Error("Folder not found");
-    await verifyVaultOwnership(ctx, folder.vaultId, userId);
+    await verifyVaultAccess(ctx.db, folder.vaultId, userId, "editor");
     await ctx.db.patch(args.id, { parentId: args.parentId });
   },
 });
@@ -119,7 +109,7 @@ export const remove = mutation({
     const userId = identity.tokenIdentifier;
     const folder = await ctx.db.get(args.id);
     if (!folder) throw new Error("Folder not found");
-    await verifyVaultOwnership(ctx, folder.vaultId, userId);
+    await verifyVaultAccess(ctx.db, folder.vaultId, userId, "editor");
 
     // Promote child folders to deleted folder's parent
     const childFolders = await ctx.db

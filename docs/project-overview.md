@@ -84,11 +84,12 @@ mrkdwn-me/
 │   │   ├── layout/               # App layout, sidebar, split panes, tabs
 │   │   ├── search/               # Search panel
 │   │   ├── settings/             # Settings dialog (OpenRouter key, vault API keys)
-│   │   └── vault/                # Vault selection, management & onboarding
+│   │   └── vault/                # Vault selection, management, sharing & onboarding
 │   ├── hooks/
 │   │   ├── useDownloadVault.ts   # Vault download hook
 │   │   ├── useExportNotePDF.ts   # Single-note PDF export hook
-│   │   └── useOnboardingGenerate.ts # AI onboarding stream hook
+│   │   ├── useOnboardingGenerate.ts # AI onboarding stream hook
+│   │   └── useVaultRole.ts       # Permission derivation hook for sharing
 │   ├── utils/
 │   │   ├── downloadVault.ts      # ZIP building utility
 │   │   └── exportNoteToPDF.ts    # PDF export utility
@@ -101,9 +102,11 @@ mrkdwn-me/
 ├── convex/                       # Backend serverless functions
 │   ├── schema.ts                 # Database schema
 │   ├── auth.config.ts            # Clerk JWT validation config
+│   ├── auth.ts                   # Shared auth module (role-based access control)
 │   ├── vaults.ts                 # Vault CRUD operations
 │   ├── folders.ts                # Folder management
 │   ├── notes.ts                  # Note CRUD, search, backlinks
+│   ├── sharing.ts                # Vault sharing (invite, accept, list, remove)
 │   ├── apiKeys.ts                # Vault API key CRUD + internal validation
 │   ├── internalApi.ts            # Auth-free internal queries/mutations for REST API
 │   ├── apiHelpers.ts             # HTTP action wrappers (apiAction, apiKeyAction)
@@ -141,17 +144,19 @@ mrkdwn-me/
 
 ## Data Model Overview
 
-The application has five database tables (users are managed by Clerk):
+The application has six database tables (users are managed by Clerk):
 
 - **Vaults** - Top-level containers owned by a user (identified by Clerk `tokenIdentifier`). All notes and folders belong to a vault.
 - **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`. Have an `order` field for sorting.
 - **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content. Have `order`, `createdAt`, and `updatedAt` fields.
+- **Vault Members** - Sharing memberships linking users to vaults with a role (editor or viewer). Owner role is implicit from `vaults.userId`. Supports email-based invitations with pending/accepted status.
 - **User Settings** - Per-user configuration (OpenRouter API key for chat edit mode). Keyed by Clerk `tokenIdentifier`.
 - **API Keys** - Vault-scoped API keys for the REST API and MCP server. Only the SHA-256 hash is stored; the raw key is shown once at creation.
 
 ```
 User (Clerk) 1──* Vault 1──* Folder (self-referencing parentId)
                        | 1──* Note
+                       | 1──* VaultMember (sharing)
                        | 1──* ApiKey
              1──1 UserSettings
 ```

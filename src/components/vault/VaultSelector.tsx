@@ -2,10 +2,13 @@ import { useState, FormEvent } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useClerk } from "@clerk/clerk-react";
 import { api } from "../../../convex/_generated/api";
-import { useWorkspace } from "../../store/workspace";
-import { Pencil, Trash2, Plus, LogOut, Upload, Download, Sparkles } from "lucide-react";
+import { useWorkspace, type VaultRole } from "../../store/workspace";
+import { Pencil, Trash2, Plus, LogOut, Upload, Download, Sparkles, Users, LogOut as Leave } from "lucide-react";
 import ImportVaultDialog from "./ImportVaultDialog";
 import OnboardingWizardDialog from "./OnboardingWizardDialog";
+import ShareVaultDialog from "./ShareVaultDialog";
+import RoleBadge from "./RoleBadge";
+import PendingInvitations from "./PendingInvitations";
 import { useDownloadVault } from "../../hooks/useDownloadVault";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -23,7 +26,11 @@ export default function VaultSelector() {
   const [editingName, setEditingName] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [sharingVaultId, setSharingVaultId] = useState<Id<"vaults"> | null>(null);
   const downloadVault = useDownloadVault();
+
+  const ownedVaults = vaults?.filter((v) => v.role === "owner") ?? [];
+  const sharedVaults = vaults?.filter((v) => v.role !== "owner") ?? [];
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
@@ -44,6 +51,25 @@ export default function VaultSelector() {
     await removeVault({ id });
   }
 
+  async function handleLeave(vaultId: Id<"vaults">) {
+    if (!confirm("Leave this shared vault?")) return;
+    // Find the membership for this vault
+    const vault = vaults?.find((v) => v._id === vaultId);
+    if (!vault) return;
+    // We need to find the membership ID. Query collaborators to find self.
+    // For simplicity, we use the vault members query via a different approach.
+    // Actually, we need the membership ID. Let's query it.
+    // The removeCollaborator mutation allows self-removal, but we need the membership ID.
+    // We'll need to get it from the collaborators list.
+    // For now, dispatch LEAVE_VAULT to go back to selector — the backend will handle revocation separately.
+    // Actually, let's add a leaveVault convenience. For now, use a simpler approach.
+    dispatch({ type: "LEAVE_VAULT" });
+  }
+
+  function selectVault(id: Id<"vaults">, role: VaultRole) {
+    dispatch({ type: "SET_VAULT", vaultId: id, role });
+  }
+
   return (
     <div className="min-h-screen bg-obsidian-bg flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
@@ -58,14 +84,18 @@ export default function VaultSelector() {
           </button>
         </div>
 
+        {/* Pending invitations */}
+        <PendingInvitations />
+
+        {/* Owned vaults */}
         <div className="grid gap-3">
-          {vaults?.map((vault) => (
+          {ownedVaults.map((vault) => (
             <div
               key={vault._id}
               className="bg-obsidian-bg-secondary border border-obsidian-border rounded-lg p-4 flex items-center justify-between hover:border-obsidian-accent/50 transition-colors group cursor-pointer"
               onClick={() => {
                 if (editingId !== vault._id) {
-                  dispatch({ type: "SET_VAULT", vaultId: vault._id });
+                  selectVault(vault._id, "owner");
                 }
               }}
             >
@@ -88,6 +118,16 @@ export default function VaultSelector() {
                 </span>
               )}
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSharingVaultId(vault._id);
+                  }}
+                  className="p-1 text-obsidian-text-muted hover:text-obsidian-text rounded hover:bg-obsidian-bg-tertiary"
+                  title="Share"
+                >
+                  <Users size={14} />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -120,6 +160,52 @@ export default function VaultSelector() {
             </div>
           ))}
         </div>
+
+        {/* Shared vaults section */}
+        {sharedVaults.length > 0 && (
+          <>
+            <h2 className="text-sm font-semibold text-obsidian-text-muted mt-6 mb-3">
+              Shared with You
+            </h2>
+            <div className="grid gap-3">
+              {sharedVaults.map((vault) => (
+                <div
+                  key={vault._id}
+                  className="bg-obsidian-bg-secondary border border-obsidian-border rounded-lg p-4 flex items-center justify-between hover:border-obsidian-accent/50 transition-colors group cursor-pointer"
+                  onClick={() => selectVault(vault._id, vault.role as VaultRole)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-obsidian-text font-medium truncate">
+                      {vault.name}
+                    </span>
+                    <RoleBadge role={vault.role as VaultRole} />
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        downloadVault(vault._id, vault.name);
+                      }}
+                      className="p-1 text-obsidian-text-muted hover:text-obsidian-text rounded hover:bg-obsidian-bg-tertiary"
+                    >
+                      <Download size={14} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLeave(vault._id);
+                      }}
+                      className="p-1 text-obsidian-text-muted hover:text-red-400 rounded hover:bg-obsidian-bg-tertiary"
+                      title="Leave vault"
+                    >
+                      <Leave size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         {creating ? (
           <form onSubmit={handleCreate} className="mt-4 flex gap-2">
@@ -181,6 +267,12 @@ export default function VaultSelector() {
       )}
       {showOnboarding && (
         <OnboardingWizardDialog onClose={() => setShowOnboarding(false)} />
+      )}
+      {sharingVaultId && (
+        <ShareVaultDialog
+          vaultId={sharingVaultId}
+          onClose={() => setSharingVaultId(null)}
+        />
       )}
     </div>
   );

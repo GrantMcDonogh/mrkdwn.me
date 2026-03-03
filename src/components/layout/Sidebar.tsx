@@ -1,14 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useWorkspace } from "../../store/workspace";
+import { useWorkspace, type VaultRole } from "../../store/workspace";
+import { useVaultRole } from "../../hooks/useVaultRole";
 import FileExplorer from "../explorer/FileExplorer";
-import { Vault, ChevronDown, Check, Download } from "lucide-react";
+import RoleBadge from "../vault/RoleBadge";
+import ShareVaultDialog from "../vault/ShareVaultDialog";
+import { Vault, ChevronDown, Check, Download, Users, LogOut } from "lucide-react";
 import { useDownloadVault } from "../../hooks/useDownloadVault";
 
 function VaultSwitcher() {
   const [state, dispatch] = useWorkspace();
+  const { canShareVault } = useVaultRole();
   const [open, setOpen] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const vaults = useQuery(api.vaults.list);
@@ -30,65 +35,107 @@ function VaultSwitcher() {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative border-b border-obsidian-border">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text hover:bg-obsidian-bg-tertiary"
-      >
-        <Vault size={14} className="shrink-0 text-obsidian-text-muted" />
-        <span className="truncate flex-1 text-left">
-          {currentVault?.name ?? "Loading..."}
-        </span>
-        <ChevronDown size={14} className="shrink-0 text-obsidian-text-muted" />
-      </button>
+    <>
+      <div ref={ref} className="relative border-b border-obsidian-border">
+        <button
+          onClick={() => setOpen(!open)}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text hover:bg-obsidian-bg-tertiary"
+        >
+          <Vault size={14} className="shrink-0 text-obsidian-text-muted" />
+          <span className="truncate flex-1 text-left">
+            {currentVault?.name ?? "Loading..."}
+          </span>
+          {currentVault?.role && currentVault.role !== "owner" && (
+            <RoleBadge role={currentVault.role as VaultRole} />
+          )}
+          <ChevronDown size={14} className="shrink-0 text-obsidian-text-muted" />
+        </button>
 
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 bg-obsidian-bg border border-obsidian-border rounded-b-md shadow-lg overflow-hidden">
-          {vaults?.map((v) => (
-            <button
-              key={v._id}
-              onClick={() => {
-                if (v._id !== state.vaultId) {
-                  dispatch({ type: "SET_VAULT", vaultId: v._id });
-                }
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text hover:bg-obsidian-bg-tertiary"
-            >
-              {v._id === state.vaultId ? (
-                <Check size={14} className="shrink-0 text-obsidian-accent" />
-              ) : (
-                <span className="w-[14px] shrink-0" />
+        {open && (
+          <div className="absolute left-0 right-0 top-full z-50 bg-obsidian-bg border border-obsidian-border rounded-b-md shadow-lg overflow-hidden">
+            {vaults?.map((v) => (
+              <button
+                key={v._id}
+                onClick={() => {
+                  if (v._id !== state.vaultId) {
+                    dispatch({
+                      type: "SET_VAULT",
+                      vaultId: v._id,
+                      role: v.role as VaultRole,
+                    });
+                  }
+                  setOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text hover:bg-obsidian-bg-tertiary"
+              >
+                {v._id === state.vaultId ? (
+                  <Check size={14} className="shrink-0 text-obsidian-accent" />
+                ) : (
+                  <span className="w-[14px] shrink-0" />
+                )}
+                <span className="truncate">{v.name}</span>
+                {v.role !== "owner" && (
+                  <RoleBadge role={v.role as VaultRole} />
+                )}
+              </button>
+            ))}
+            <div className="border-t border-obsidian-border">
+              {state.vaultId && currentVault && (
+                <button
+                  onClick={() => {
+                    downloadVault(state.vaultId!, currentVault.name);
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text-muted hover:bg-obsidian-bg-tertiary"
+                >
+                  <Download size={14} className="shrink-0" />
+                  Download Vault
+                </button>
               )}
-              <span className="truncate">{v.name}</span>
-            </button>
-          ))}
-          <div className="border-t border-obsidian-border">
-            {state.vaultId && currentVault && (
+              {canShareVault && state.vaultId && (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    setShowShare(true);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text-muted hover:bg-obsidian-bg-tertiary"
+                >
+                  <Users size={14} className="shrink-0" />
+                  Share Vault...
+                </button>
+              )}
+              {!canShareVault && state.vaultId && (
+                <button
+                  onClick={() => {
+                    dispatch({ type: "LEAVE_VAULT" });
+                    setOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text-muted hover:bg-obsidian-bg-tertiary"
+                >
+                  <LogOut size={14} className="shrink-0" />
+                  Leave Vault
+                </button>
+              )}
               <button
                 onClick={() => {
-                  downloadVault(state.vaultId!, currentVault.name);
+                  dispatch({ type: "LEAVE_VAULT" });
                   setOpen(false);
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text-muted hover:bg-obsidian-bg-tertiary"
               >
-                <Download size={14} className="shrink-0" />
-                Download Vault
+                Manage Vaults...
               </button>
-            )}
-            <button
-              onClick={() => {
-                dispatch({ type: "LEAVE_VAULT" });
-                setOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-obsidian-text-muted hover:bg-obsidian-bg-tertiary"
-            >
-              Manage Vaults...
-            </button>
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+      {showShare && state.vaultId && (
+        <ShareVaultDialog
+          vaultId={state.vaultId}
+          onClose={() => setShowShare(false)}
+        />
       )}
-    </div>
+    </>
   );
 }
 

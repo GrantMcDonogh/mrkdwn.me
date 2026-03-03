@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
+import { useVaultRole } from "../../hooks/useVaultRole";
 import Sidebar from "./Sidebar";
 import TabBar from "./TabBar";
 import NoteView from "../editor/NoteView";
@@ -13,6 +14,8 @@ import SplitPane from "./SplitPane";
 import CommandPalette from "../command-palette/CommandPalette";
 import QuickSwitcher from "../command-palette/QuickSwitcher";
 import SettingsDialog from "../settings/SettingsDialog";
+import ShareVaultDialog from "../vault/ShareVaultDialog";
+import RoleBadge from "../vault/RoleBadge";
 import {
   PanelLeft,
   Link2,
@@ -21,10 +24,12 @@ import {
   FileText,
   MessageSquare,
   Settings,
+  Users,
 } from "lucide-react";
 
 export default function AppLayout() {
   const [state, dispatch] = useWorkspace();
+  const { canEditNotes, canShareVault, role } = useVaultRole();
   const vault = useQuery(
     api.vaults.get,
     state.vaultId ? { id: state.vaultId } : "skip"
@@ -32,6 +37,14 @@ export default function AppLayout() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+
+  // Detect access revocation — vault query returns error/null for revoked users
+  useEffect(() => {
+    if (state.vaultId && vault === null) {
+      dispatch({ type: "LEAVE_VAULT" });
+    }
+  }, [state.vaultId, vault, dispatch]);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -49,6 +62,8 @@ export default function AppLayout() {
       }
       if (mod && e.key === "e") {
         e.preventDefault();
+        // Block Ctrl+E for viewers
+        if (!canEditNotes) return;
         const activePane = state.panes.find(
           (p) => p.id === state.activePaneId
         );
@@ -64,7 +79,7 @@ export default function AppLayout() {
         }
       }
     },
-    [state.panes, state.activePaneId, dispatch]
+    [state.panes, state.activePaneId, dispatch, canEditNotes]
   );
 
   useEffect(() => {
@@ -138,7 +153,19 @@ export default function AppLayout() {
         <span className="text-sm text-obsidian-text ml-2 truncate">
           {vault?.name ?? ""}
         </span>
+        {role && role !== "owner" && (
+          <RoleBadge role={role} />
+        )}
         <div className="flex-1" />
+        {canShareVault && state.vaultId && (
+          <button
+            onClick={() => setShowShare(true)}
+            className="p-1.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
+            title="Share Vault"
+          >
+            <Users size={18} />
+          </button>
+        )}
         <button
           onClick={() =>
             dispatch({ type: "SET_RIGHT_PANEL", panel: "backlinks" })
@@ -229,6 +256,10 @@ export default function AppLayout() {
             setShowCommandPalette(false);
             setShowSettings(true);
           }}
+          onOpenShare={() => {
+            setShowCommandPalette(false);
+            setShowShare(true);
+          }}
         />
       )}
       {showQuickSwitcher && (
@@ -236,6 +267,12 @@ export default function AppLayout() {
       )}
       {showSettings && (
         <SettingsDialog onClose={() => setShowSettings(false)} vaultId={state.vaultId ?? undefined} />
+      )}
+      {showShare && state.vaultId && (
+        <ShareVaultDialog
+          vaultId={state.vaultId}
+          onClose={() => setShowShare(false)}
+        />
       )}
     </div>
   );

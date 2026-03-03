@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type FormEvent } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace, getActiveNoteId } from "../../store/workspace";
+import { useVaultRole } from "../../hooks/useVaultRole";
 import { useChatStream } from "./useChatStream";
 import ChatMessage from "./ChatMessage";
 import SettingsDialog from "../settings/SettingsDialog";
@@ -9,6 +10,7 @@ import { Send, Trash2, Settings, Sparkles } from "lucide-react";
 
 export default function ChatPanel() {
   const [state, dispatch] = useWorkspace();
+  const { canEditNotes } = useVaultRole();
   const vaultId = state.vaultId!;
   const activeNoteId = getActiveNoteId(state);
   const allNotes = useQuery(api.notes.list, { vaultId });
@@ -47,7 +49,7 @@ export default function ChatPanel() {
           <span className="text-xs font-semibold uppercase text-obsidian-text-muted">
             Chat
           </span>
-          {hasKey && (
+          {hasKey && canEditNotes && (
             <button
               onClick={() => setEditModeOn((v) => !v)}
               className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors ${

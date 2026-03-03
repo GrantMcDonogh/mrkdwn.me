@@ -25,9 +25,10 @@ Convex httpAction (convex/chat.ts)
   |
   | 1. Authenticate via ctx.auth.getUserIdentity()
   | 2. Validate request body (vaultId, message)
-  | 3. Build context via chatHelpers.buildContext (internal query)
-  | 4. Call Anthropic API (claude-sonnet-4-5-20250929) with stream: true
-  | 5. Stream response via TransformStream
+  | 3. Verify vault access (viewer role minimum) via auth.checkVaultAccess
+  | 4. Build context via chatHelpers.buildContext (internal query)
+  | 5. Call Anthropic API (claude-sonnet-4-5-20250929) with stream: true
+  | 6. Stream response via TransformStream
   |
   v
 TransformStream → streamed response back to client
@@ -46,10 +47,11 @@ Client (ChatPanel)
 Convex httpAction (convex/chatEdit.ts)
   |
   | 1. Authenticate via ctx.auth.getUserIdentity()
-  | 2. Retrieve user's OpenRouter key via userSettings.getOpenRouterKey
-  | 3. Build context via chatEditHelpers.buildEditContext (includes active note)
-  | 4. Call OpenRouter API (anthropic/claude-sonnet-4) with stream: true
-  | 5. Stream response via TransformStream
+  | 2. Verify vault access (editor role minimum) via auth.checkVaultAccess
+  | 3. Retrieve user's OpenRouter key via userSettings.getOpenRouterKey
+  | 4. Build context via chatEditHelpers.buildEditContext (includes active note)
+  | 5. Call OpenRouter API (anthropic/claude-sonnet-4) with stream: true
+  | 6. Stream response via TransformStream
   |
   v
 TransformStream → streamed response back to client
@@ -68,7 +70,7 @@ Convex queries and mutations don't support streaming responses. The chat endpoin
 
 **Edit mode:** Context is built by `convex/chatEditHelpers.ts`, an `internalQuery` called `buildEditContext`. It follows the same dual-index search pattern but additionally accepts an `activeNoteId` parameter. When provided, the active note's full content is included first (labelled as "ACTIVE NOTE") before adding search results. The active note is excluded from search results to avoid duplication.
 
-> **Note:** Vault ownership is not explicitly verified in the chat endpoints — any authenticated user who knows a vault ID could potentially query its notes.
+Both endpoints verify vault access before building context. Q&A mode requires at least **viewer** access; edit mode requires at least **editor** access. This prevents unauthorized users from querying vault notes via the chat API.
 
 ## Context Building
 
@@ -114,7 +116,7 @@ The context builder uses a two-tier approach to maximize relevance within the to
 |--------|-----------|
 | 401 | No valid user identity |
 | 400 | Missing `vaultId` or `message` in request body |
-| 403 | `buildContext` returned null |
+| 403 | User lacks viewer access to the vault, or `buildContext` returned null |
 | 500 | `ANTHROPIC_API_KEY` env var not set |
 | 502 | Claude API returned a non-OK response |
 
@@ -140,7 +142,7 @@ The context builder uses a two-tier approach to maximize relevance within the to
 |--------|-----------|
 | 401 | No valid user identity |
 | 400 | Missing `vaultId` or `message`, OpenRouter API key not configured, or OpenRouter API returned a non-OK response (JSON body: `{ error: "..." }`) |
-| 403 | `buildEditContext` returned null |
+| 403 | User lacks editor access to the vault, or `buildEditContext` returned null |
 | 500 | Server error |
 
 ### CORS
@@ -233,6 +235,7 @@ The chat panel automatically selects the endpoint based on the user's OpenRouter
 
 - **No key configured** → Q&A mode (`/api/chat`), placeholder: "Ask about your notes..."
 - **Key configured** → Edit mode (`/api/chat-edit`), placeholder: "Ask about or edit your notes...", active note ID is passed to the backend
+- **Viewer role** → Edit mode toggle is hidden regardless of OpenRouter key status. Viewers can only use Q&A mode.
 
 ### ChatMessage
 

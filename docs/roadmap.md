@@ -145,3 +145,9 @@ AI chat responses are now rendered as formatted markdown (headings, bold, lists,
 ### Concise Chat Responses — Mar 3, 2026
 AI chat responses are now brief (1-3 sentences) with `[[wiki links]]` to source notes, letting users click through for details.
 Longer responses are only produced when the user explicitly asks for detail.
+
+### Vault Sharing — Mar 3, 2026
+Multi-user vault sharing with three roles: Owner, Editor, and Viewer. Owners invite collaborators by email; invitees see pending invitations on the vault selector and accept to gain access. Editors get full CRUD on notes and folders; viewers see everything read-only with the editor locked to preview mode. Shared vaults appear in a separate "Shared with You" section on the vault selector. Includes a sharing management dialog for owners, role badges throughout the UI, and permission-gated controls (file explorer, tab bar, command palette, drag-and-drop). Also fixes a security gap where the chat endpoints did not verify vault access.
+
+### Chat Endpoint Security Fix — Mar 3, 2026
+The `/api/chat` and `/api/chat-edit` httpAction endpoints now verify the authenticated user has access to the requested vault before building context. Previously, any authenticated user who knew a vault ID could query its notes. Q&A mode requires viewer access; edit mode requires editor access.

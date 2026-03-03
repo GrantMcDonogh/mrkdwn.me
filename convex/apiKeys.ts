@@ -1,6 +1,7 @@
 import { query, mutation, action, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { verifyVaultAccess } from "./auth";
 
 // --- Public (Clerk JWT auth, for frontend UI) ---
 
@@ -10,9 +11,7 @@ export const list = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    // Verify vault ownership
-    const vault = await ctx.db.get(args.vaultId);
-    if (!vault || vault.userId !== userId) throw new Error("Vault not found");
+    await verifyVaultAccess(ctx.db, args.vaultId, userId, "owner");
     const keys = await ctx.db
       .query("apiKeys")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
@@ -104,6 +103,7 @@ export const touchLastUsed = internalMutation({
 export const getVaultForUser = internalQuery({
   args: { vaultId: v.id("vaults"), userId: v.string() },
   handler: async (ctx, args) => {
+    // API keys are owner-only
     const vault = await ctx.db.get(args.vaultId);
     if (!vault || vault.userId !== args.userId) return null;
     return vault;

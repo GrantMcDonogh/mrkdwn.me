@@ -145,11 +145,60 @@ const userId = identity.tokenIdentifier;
 - The `tokenIdentifier` string from the identity object is used as the user ID for data ownership.
 - Throws immediately if no valid identity is present.
 
+### Shared Auth Module
+
+**File:** `convex/auth.ts`
+
+A centralized authorization module that replaces the previously duplicated `verifyVaultOwnership` helpers. Provides role-based access control for vault sharing.
+
+**Role hierarchy:** `owner (3) > editor (2) > viewer (1)`
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `getVaultRole(db, vaultId, userId)` | Helper | Returns `"owner" \| "editor" \| "viewer" \| null`. Fast path: checks `vault.userId === userId` (owner). Slow path: queries `vaultMembers` via `by_vault_user` index for accepted memberships. |
+| `verifyVaultAccess(db, vaultId, userId, minimumRole)` | Helper | Throws `"Vault not found"` if the user lacks the minimum role. Returns the actual role on success. |
+| `checkVaultAccess` | Internal Query | Same logic as `verifyVaultAccess` but returns the role or `null` (no throw). Used by httpActions via `ctx.runQuery`. |
+
+**Usage pattern:**
+
+```typescript
+import { verifyVaultAccess } from "./auth";
+
+export const update = mutation({
+  args: { id: v.id("notes"), content: v.string() },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+    const note = await ctx.db.get(args.id);
+    if (!note) throw new Error("Note not found");
+    await verifyVaultAccess(ctx.db, note.vaultId, identity.tokenIdentifier, "editor");
+    // ... proceed with mutation
+  },
+});
+```
+
+### Endpoint Permission Map
+
+| Endpoint | Minimum Role |
+|----------|-------------|
+| `notes.list`, `notes.get`, `notes.search`, `notes.getBacklinks`, `notes.getUnlinkedMentions` | viewer |
+| `notes.create`, `notes.update`, `notes.rename`, `notes.move`, `notes.remove`, `notes.importBatch` | editor |
+| `folders.list` | viewer |
+| `folders.create`, `folders.rename`, `folders.move`, `folders.remove` | editor |
+| `vaults.rename`, `vaults.remove` | owner |
+| `apiKeys.list` | owner |
+| `sharing.inviteCollaborator` | owner |
+| `sharing.listCollaborators` | viewer |
+| `sharing.updateCollaboratorRole`, `sharing.removeCollaborator` | owner (or self for leave) |
+| `/api/chat` | viewer |
+| `/api/chat-edit` | editor |
+
 ### Data Isolation
 
-- **Vaults** are filtered by `userId` (the Clerk `tokenIdentifier`) — users can only see and modify their own vaults.
-- **Folders and Notes** are accessed through vaults, inheriting the vault's ownership check via a `verifyVaultOwnership()` helper.
-- There is no shared/collaborative access model — each user's data is fully isolated.
+- **Vaults** are filtered by `userId` (the Clerk `tokenIdentifier`) for owned vaults, plus `vaultMembers` for shared vaults.
+- **Folders and Notes** are accessed through vaults, inheriting the vault's role-based access check via `verifyVaultAccess()`.
+- Shared vaults are read-only for viewers and read-write for editors. Only owners can manage vault settings, API keys, and sharing.
+- Pending invitations (not yet accepted) do **not** grant any access.
 
 ## Sign Out
 
@@ -216,6 +265,9 @@ Rendered inside the Settings dialog when a vault is active. Shows:
 - All Convex queries and mutations require a valid JWT; there are no public/unauthenticated endpoints for data access (except the REST API v1 which uses API key auth).
 - API keys are stored as SHA-256 hashes only — raw keys are shown once at creation and never retrievable.
 - There is no `users` table in the Convex schema — user identity is derived from the Clerk JWT's `tokenIdentifier`.
+- The Clerk JWT template for Convex does **not** include the `email` claim — `identity.email` is `undefined` at runtime. User emails are obtained from the Clerk frontend SDK (`useUser().primaryEmailAddress.emailAddress`) and passed as explicit arguments where needed (e.g., invite acceptance, pending invitations).
+- The shared auth module (`convex/auth.ts`) centralizes all access control, replacing previously duplicated ownership checks. The role hierarchy (owner > editor > viewer) is enforced server-side.
+- Chat endpoints (`/api/chat` and `/api/chat-edit`) verify vault access before building RAG context, preventing unauthorized users from querying vault notes.
 
 ## Environment Variables
 

@@ -16,31 +16,32 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 │──────────────│
 │ _id          │
 │ name         │
-│ userId ──────┼──→ Clerk tokenIdentifier (string)
+│ userId ──────┼──→ Clerk tokenIdentifier (string, owner)
 │ createdAt    │
 │ settings?    │
 │ idx: by_user │
 └──────┬───────┘
        │ 1
        │
-   ┌───┴────────────────┐
-   │ *                  │ *
-┌──▼───────────┐  ┌─────▼────────┐
-│   folders    │  │    notes     │
-│──────────────│  │──────────────│
-│ _id          │  │ _id          │
-│ name         │  │ title        │
-│ parentId ────┼──┐ content      │
-│ vaultId ─────┼──┼→ folderId ───┼──→ folders._id (optional)
-│ order        │  │ vaultId ─────┼──→ vaults._id
-│ idx: by_vault│  │ order        │
-│ idx: by_parent│ │ createdAt    │
-└──────────────┘  │ updatedAt    │
-       ▲          │ idx: by_vault│
-       │          │ idx: by_folder│
-       └──────────┤ search: content│
-    (self-ref     │ search: title │
-     parentId)    └──────────────┘
+   ┌───┴───────────────────┬──────────────────┐
+   │ *                     │ *                 │ *
+┌──▼───────────┐  ┌────────▼──────┐  ┌────────▼──────────┐
+│   folders    │  │    notes      │  │  vaultMembers     │
+│──────────────│  │───────────────│  │───────────────────│
+│ _id          │  │ _id           │  │ _id               │
+│ name         │  │ title         │  │ vaultId ──────────┼→ vaults._id
+│ parentId ────┼──┐ content       │  │ userId            │
+│ vaultId ─────┼──┼→ folderId ────┼→ │ email             │
+│ order        │  │ vaultId ──────┼→ │ role (editor|viewer)│
+│ idx: by_vault│  │ order         │  │ invitedBy         │
+│ idx: by_parent│ │ createdAt     │  │ invitedAt         │
+└──────────────┘  │ updatedAt     │  │ status            │
+       ▲          │ idx: by_vault │  │ acceptedAt?       │
+       │          │ idx: by_folder│  │ idx: by_vault     │
+       └──────────┤ search: content│ │ idx: by_user      │
+    (self-ref     │ search: title │  │ idx: by_vault_user│
+     parentId)    └───────────────┘  │ idx: by_email_status│
+                                     └───────────────────┘
 
 ┌────────────────┐
 │ userSettings   │
@@ -147,6 +148,26 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 - `by_hash` → `["keyHash"]` — Fast lookup by key hash for authentication
 - `by_vault` → `["vaultId"]` — List all keys for a vault
 
+#### `vaultMembers`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `_id` | `Id<"vaultMembers">` | Primary key |
+| `vaultId` | `v.id("vaults")` | The vault being shared |
+| `userId` | `v.string()` | Clerk `tokenIdentifier` of the member (empty string while pending) |
+| `email` | `v.string()` | Normalized lowercase email, used for invite matching |
+| `role` | `v.union(v.literal("editor"), v.literal("viewer"))` | Access level (owner is implicit, not stored here) |
+| `invitedBy` | `v.string()` | `tokenIdentifier` of the user who sent the invite |
+| `invitedAt` | `v.number()` | Invitation timestamp |
+| `status` | `v.union(v.literal("pending"), v.literal("accepted"))` | Membership status |
+| `acceptedAt` | `v.optional(v.number())` | Acceptance timestamp (set when invite is accepted) |
+
+**Indexes:**
+- `by_vault` → `["vaultId"]` — All members of a vault
+- `by_user` → `["userId"]` — All vaults a user is a member of
+- `by_vault_user` → `["vaultId", "userId"]` — Fast lookup for access checks
+- `by_email_status` → `["email", "status"]` — Pending invitations by email
+
 ---
 
 ## API Reference
@@ -155,14 +176,14 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 
 **File:** `convex/vaults.ts`
 
-| Function | Type | Parameters | Returns | Description |
-|----------|------|-----------|---------|-------------|
-| `vaults.list` | Query | — | `Vault[]` | List user's vaults |
-| `vaults.get` | Query | `{ id }` | `Vault` | Get vault (with ownership check) |
-| `vaults.create` | Mutation | `{ name }` | `Id<"vaults">` | Create vault |
-| `vaults.rename` | Mutation | `{ id, name }` | — | Rename vault |
-| `vaults.remove` | Mutation | `{ id }` | — | Delete vault + all contents |
-| `vaults.importCreateVault` | Internal Mutation | `{ name, userId, settings? }` | `Id<"vaults">` | Create vault (called from import action) |
+| Function | Type | Parameters | Auth | Returns | Description |
+|----------|------|-----------|------|---------|-------------|
+| `vaults.list` | Query | — | Authenticated | `(Vault & { role })[]` | List owned + shared vaults with role |
+| `vaults.get` | Query | `{ id }` | Viewer+ | `Vault & { role }` | Get vault with access check |
+| `vaults.create` | Mutation | `{ name }` | Authenticated | `Id<"vaults">` | Create vault |
+| `vaults.rename` | Mutation | `{ id, name }` | Owner | — | Rename vault |
+| `vaults.remove` | Mutation | `{ id }` | Owner | — | Delete vault + all contents + members + API keys |
+| `vaults.importCreateVault` | Internal Mutation | `{ name, userId, settings? }` | Internal | `Id<"vaults">` | Create vault (called from import action) |
 
 ### Folder Operations
 
@@ -208,6 +229,29 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `apiKeys.touchLastUsed` | Internal Mutation | `{ id }` | — | Update `lastUsedAt` timestamp |
 | `apiKeys.getVaultForUser` | Internal Query | `{ vaultId, userId }` | `Vault \| null` | Verify vault ownership (used by create action) |
 | `apiKeys.insertKey` | Internal Mutation | `{ keyHash, keyPrefix, vaultId, userId, name, createdAt }` | `Id<"apiKeys">` | Store key record (used by create action) |
+
+### Sharing Operations
+
+**File:** `convex/sharing.ts`
+
+| Function | Type | Parameters | Auth | Returns | Description |
+|----------|------|-----------|------|---------|-------------|
+| `sharing.inviteCollaborator` | Mutation | `{ vaultId, email, role }` | Owner | `Id<"vaultMembers">` | Invite a user by email |
+| `sharing.acceptInvitation` | Mutation | `{ membershipId, email }` | Authenticated | — | Accept a pending invite |
+| `sharing.getPendingInvitations` | Query | `{ email }` | Authenticated | `(VaultMember & { vaultName })[]` | List pending invites by email |
+| `sharing.listCollaborators` | Query | `{ vaultId }` | Viewer+ | `{ owner, members }` | List all collaborators |
+| `sharing.updateCollaboratorRole` | Mutation | `{ membershipId, role }` | Owner | — | Change a collaborator's role |
+| `sharing.removeCollaborator` | Mutation | `{ membershipId }` | Owner or self | — | Remove collaborator or leave vault |
+
+### Auth Module
+
+**File:** `convex/auth.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `getVaultRole` | Helper | `(db, vaultId, userId)` | `VaultRole \| null` | Determine user's role in a vault |
+| `verifyVaultAccess` | Helper | `(db, vaultId, userId, minimumRole)` | `VaultRole` | Verify access, throw on insufficient role |
+| `auth.checkVaultAccess` | Internal Query | `{ vaultId, userId, minimumRole }` | `VaultRole \| null` | Access check for httpActions |
 
 ### Internal API (Auth-free)
 
@@ -339,21 +383,19 @@ A public-facing API documentation page is available at `/docs` (rendered by `src
 
 ### Clerk JWT Auth (frontend queries/mutations)
 
-Every query and mutation follows the same authorization pattern:
+Every query and mutation follows the same authorization pattern, using the shared auth module:
 
 ```typescript
+import { verifyVaultAccess } from "./auth";
+
 export const someFunction = query({
-  args: { /* ... */ },
+  args: { vaultId: v.id("vaults") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const userId = identity.tokenIdentifier;
 
-    // For vault operations: verify vault ownership
-    const vault = await ctx.db.get(args.vaultId);
-    if (!vault || vault.userId !== userId) {
-      throw new Error("Vault not found");
-    }
+    // Role-based access check (throws if insufficient)
+    await verifyVaultAccess(ctx.db, args.vaultId, identity.tokenIdentifier, "viewer");
 
     // ... proceed with operation
   },
@@ -361,8 +403,9 @@ export const someFunction = query({
 ```
 
 - **Authentication**: Every function calls `ctx.auth.getUserIdentity()` to verify the Clerk JWT.
-- **Authorization**: Vault operations verify that the requesting user's `tokenIdentifier` matches the vault's `userId`.
-- **Data isolation**: Queries are scoped by `userId` (vaults) or `vaultId` (folders/notes).
+- **Authorization**: `verifyVaultAccess` checks the user's role against a minimum requirement. Owner is determined by `vault.userId` match; editor/viewer by the `vaultMembers` table.
+- **Data isolation**: Queries are scoped by `vaultId`. The role check ensures only authorized users can access vault data.
+- **httpActions**: Use `ctx.runQuery(internal.auth.checkVaultAccess, ...)` since httpActions cannot call helper functions directly.
 
 ### API Key Auth (REST API v1)
 
@@ -459,6 +502,8 @@ For each note in vault:
 ```
 Delete all notes where vaultId = vault._id
 Delete all folders where vaultId = vault._id
+Delete all vaultMembers where vaultId = vault._id
+Delete all apiKeys where vaultId = vault._id
 Delete the vault document
 ```
 

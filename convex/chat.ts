@@ -29,6 +29,19 @@ export const chat = httpAction(async (ctx, request) => {
     });
   }
 
+  // Verify the user has at least viewer access to this vault
+  const accessRole = await ctx.runQuery(internal.auth.checkVaultAccess, {
+    vaultId,
+    userId: identity.tokenIdentifier,
+    minimumRole: "viewer",
+  });
+  if (!accessRole) {
+    return new Response("Vault not found or not authorized", {
+      status: 403,
+      headers: corsHeaders,
+    });
+  }
+
   // Build context by fetching vault notes
   const contextData = await ctx.runQuery(
     internal.chatHelpers.buildContext,

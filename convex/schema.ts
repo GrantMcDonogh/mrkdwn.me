@@ -42,6 +42,21 @@ export default defineSchema({
     openRouterKey: v.optional(v.string()),
   }).index("by_user", ["userId"]),
 
+  vaultMembers: defineTable({
+    vaultId: v.id("vaults"),
+    userId: v.string(),
+    email: v.string(),
+    role: v.union(v.literal("editor"), v.literal("viewer")),
+    invitedBy: v.string(),
+    invitedAt: v.number(),
+    status: v.union(v.literal("pending"), v.literal("accepted")),
+    acceptedAt: v.optional(v.number()),
+  })
+    .index("by_vault", ["vaultId"])
+    .index("by_user", ["userId"])
+    .index("by_vault_user", ["vaultId", "userId"])
+    .index("by_email_status", ["email", "status"]),
+
   apiKeys: defineTable({
     keyHash: v.string(),
     keyPrefix: v.string(),

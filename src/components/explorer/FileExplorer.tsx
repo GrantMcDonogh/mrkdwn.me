@@ -2,6 +2,7 @@ import { useState, useRef, type KeyboardEvent } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
+import { useVaultRole } from "../../hooks/useVaultRole";
 import {
   ChevronRight,
   ChevronDown,
@@ -19,6 +20,7 @@ import { batchNotes, prepareUploadNotes } from "../../lib/importVault";
 
 export default function FileExplorer() {
   const [state, dispatch] = useWorkspace();
+  const { canEdit, canDragDrop } = useVaultRole();
   const vaultId = state.vaultId!;
   const folders = useQuery(api.folders.list, { vaultId });
   const notes = useQuery(api.notes.list, { vaultId });
@@ -249,13 +251,13 @@ export default function FileExplorer() {
               }`}
               style={{ paddingLeft: `${depth * 16}px` }}
               onClick={() => toggleFolder(folder._id)}
-              draggable
+              draggable={canDragDrop}
               onDragStart={(e) =>
-                handleDragStart(e, folder._id, "folder")
+                canDragDrop && handleDragStart(e, folder._id, "folder")
               }
-              onDragOver={(e) => handleDragOver(e, folder._id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, folder._id)}
+              onDragOver={(e) => canDragDrop && handleDragOver(e, folder._id)}
+              onDragLeave={canDragDrop ? handleDragLeave : undefined}
+              onDrop={(e) => canDragDrop && handleDrop(e, folder._id)}
             >
               {expanded.has(folder._id) ? (
                 <ChevronDown size={14} className="text-obsidian-text-muted shrink-0" />
@@ -285,6 +287,7 @@ export default function FileExplorer() {
                 <span
                   className="truncate text-obsidian-text"
                   onDoubleClick={(e) => {
+                    if (!canEdit) return;
                     e.stopPropagation();
                     startRename(folder._id, folder.name);
                   }}
@@ -292,6 +295,7 @@ export default function FileExplorer() {
                   {folder.name}
                 </span>
               )}
+              {canEdit && (
               <div className="ml-auto flex gap-0.5 opacity-0 group-hover:opacity-100">
                 <button
                   onClick={(e) => {
@@ -332,6 +336,7 @@ export default function FileExplorer() {
                   <Trash2 size={12} />
                 </button>
               </div>
+              )}
             </div>
             {expanded.has(folder._id) &&
               renderTree(folder._id, depth + 1)}
@@ -373,9 +378,9 @@ export default function FileExplorer() {
             onClick={() =>
               dispatch({ type: "OPEN_NOTE", noteId: note._id })
             }
-            draggable
+            draggable={canDragDrop}
             onDragStart={(e) =>
-              handleDragStart(e, note._id, "note")
+              canDragDrop && handleDragStart(e, note._id, "note")
             }
           >
             <FileText size={14} className="text-obsidian-text-muted shrink-0" />
@@ -397,6 +402,7 @@ export default function FileExplorer() {
               <span
                 className="truncate text-obsidian-text"
                 onDoubleClick={(e) => {
+                  if (!canEdit) return;
                   e.stopPropagation();
                   startRename(note._id, note.title);
                 }}
@@ -404,12 +410,12 @@ export default function FileExplorer() {
                 {note.title}
               </span>
             )}
+            {canEdit && (
             <div className="ml-auto flex gap-0.5 opacity-0 group-hover:opacity-100">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!confirm("Are you sure you want to permanently delete this note?")) return;
-                  // Close any tabs showing this note before deleting
                   for (const pane of state.panes) {
                     for (const tab of pane.tabs) {
                       if (tab.noteId === note._id) {
@@ -424,6 +430,7 @@ export default function FileExplorer() {
                 <Trash2 size={12} />
               </button>
             </div>
+            )}
           </div>
         ))}
       </>
@@ -451,6 +458,7 @@ export default function FileExplorer() {
             Explorer
           </span>
         )}
+        {canEdit && (
         <div className="flex gap-1">
           <button
             onClick={() => handleCreateNote(undefined)}
@@ -474,15 +482,16 @@ export default function FileExplorer() {
             <Upload size={14} />
           </button>
         </div>
+        )}
       </div>
       <div
         className="flex-1 overflow-y-auto py-1"
-        onDragOver={(e) => {
+        onDragOver={canDragDrop ? (e) => {
           e.preventDefault();
           setDragOverId("root");
-        }}
-        onDragLeave={() => setDragOverId(null)}
-        onDrop={(e) => handleDrop(e, undefined)}
+        } : undefined}
+        onDragLeave={canDragDrop ? () => setDragOverId(null) : undefined}
+        onDrop={canDragDrop ? (e) => handleDrop(e, undefined) : undefined}
       >
         {folders && notes && folders.length === 0 && notes.length === 0 && !creatingIn ? (
           <p className="text-center py-8 text-obsidian-text-muted text-xs">

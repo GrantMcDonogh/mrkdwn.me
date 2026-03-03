@@ -1,5 +1,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { verifyVaultAccess, getVaultRole } from "./auth";
+import type { VaultRole } from "./auth";
 
 export const list = query({
   args: {},
@@ -7,10 +9,35 @@ export const list = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
-    return ctx.db
+
+    // Owned vaults
+    const owned = await ctx.db
       .query("vaults")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
+    const ownedResults = owned.map((v) => ({
+      ...v,
+      role: "owner" as VaultRole,
+    }));
+
+    // Shared vaults (accepted memberships)
+    const memberships = await ctx.db
+      .query("vaultMembers")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const sharedResults = [];
+    for (const m of memberships) {
+      if (m.status !== "accepted") continue;
+      const vault = await ctx.db.get(m.vaultId);
+      if (vault) {
+        sharedResults.push({
+          ...vault,
+          role: m.role as VaultRole,
+        });
+      }
+    }
+
+    return [...ownedResults, ...sharedResults];
   },
 });
 
@@ -20,11 +47,11 @@ export const get = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
+    const role = await getVaultRole(ctx.db, args.id, userId);
+    if (!role) throw new Error("Vault not found");
     const vault = await ctx.db.get(args.id);
-    if (!vault || vault.userId !== userId) {
-      throw new Error("Vault not found");
-    }
-    return vault;
+    if (!vault) throw new Error("Vault not found");
+    return { ...vault, role };
   },
 });
 
@@ -59,11 +86,7 @@ export const rename = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const userId = identity.tokenIdentifier;
-    const vault = await ctx.db.get(args.id);
-    if (!vault || vault.userId !== userId) {
-      throw new Error("Vault not found");
-    }
+    await verifyVaultAccess(ctx.db, args.id, identity.tokenIdentifier, "owner");
     await ctx.db.patch(args.id, { name: args.name });
   },
 });
@@ -73,11 +96,8 @@ export const remove = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    const userId = identity.tokenIdentifier;
-    const vault = await ctx.db.get(args.id);
-    if (!vault || vault.userId !== userId) {
-      throw new Error("Vault not found");
-    }
+    await verifyVaultAccess(ctx.db, args.id, identity.tokenIdentifier, "owner");
+
     // Cascade: delete all notes
     const notes = await ctx.db
       .query("notes")
@@ -93,6 +113,22 @@ export const remove = mutation({
       .collect();
     for (const folder of folders) {
       await ctx.db.delete(folder._id);
+    }
+    // Cascade: delete all vault memberships
+    const members = await ctx.db
+      .query("vaultMembers")
+      .withIndex("by_vault", (q) => q.eq("vaultId", args.id))
+      .collect();
+    for (const member of members) {
+      await ctx.db.delete(member._id);
+    }
+    // Cascade: delete all API keys
+    const apiKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_vault", (q) => q.eq("vaultId", args.id))
+      .collect();
+    for (const key of apiKeys) {
+      await ctx.db.delete(key._id);
     }
     await ctx.db.delete(args.id);
   },

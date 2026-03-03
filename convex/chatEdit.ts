@@ -28,6 +28,19 @@ export const chatEdit = httpAction(async (ctx, request) => {
       });
     }
 
+    // Verify the user has at least editor access to this vault
+    const accessRole = await ctx.runQuery(internal.auth.checkVaultAccess, {
+      vaultId,
+      userId: identity.tokenIdentifier,
+      minimumRole: "editor",
+    });
+    if (!accessRole) {
+      return new Response("Vault not found or not authorized", {
+        status: 403,
+        headers: corsHeaders,
+      });
+    }
+
     // Get the user's OpenRouter key
     const openRouterKey = await ctx.runQuery(
       internal.userSettings.getOpenRouterKey,

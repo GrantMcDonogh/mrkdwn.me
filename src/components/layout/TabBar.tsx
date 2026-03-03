@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
+import { useVaultRole } from "../../hooks/useVaultRole";
 import { X, GitFork, Eye, Pencil, FileDown } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { useExportNotePDF } from "../../hooks/useExportNotePDF";
@@ -32,6 +33,7 @@ function NoteTabItem({
   mode: "preview" | "edit";
 }) {
   const [, dispatch] = useWorkspace();
+  const { canEditNotes } = useVaultRole();
   const note = useQuery(api.notes.get, { id: noteId });
   const exportPDF = useExportNotePDF();
   const ModeIcon = mode === "edit" ? Pencil : Eye;
@@ -46,6 +48,7 @@ function NoteTabItem({
       onClick={() => dispatch({ type: "SET_ACTIVE_TAB", paneId, tabId })}
     >
       <span className="truncate">{note?.title ?? "..."}</span>
+      {canEditNotes && (
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -56,6 +59,7 @@ function NoteTabItem({
       >
         <ModeIcon size={12} />
       </button>
+      )}
       <button
         onClick={(e) => {
           e.stopPropagation();

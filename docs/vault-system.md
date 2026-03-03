@@ -35,21 +35,21 @@ vaults: defineTable({
 
 #### `vaults.list`
 
-Lists all vaults owned by the authenticated user.
+Lists all vaults the authenticated user has access to (owned + shared).
 
 - **Auth**: Required
 - **Parameters**: None
-- **Returns**: Array of vault documents, queried via the `by_user` index
-- **Usage**: Called by `VaultSelector` to display the vault list
+- **Returns**: Array of vault objects, each with a `role` field (`"owner"`, `"editor"`, or `"viewer"`). Owned vaults are queried via the `by_user` index; shared vaults via the `vaultMembers` `by_user` index (accepted memberships only).
+- **Usage**: Called by `VaultSelector` to display the vault list, split into "Your Vaults" and "Shared with You" sections.
 
 #### `vaults.get`
 
-Retrieves a single vault by ID with ownership verification.
+Retrieves a single vault by ID with access verification.
 
 - **Auth**: Required
 - **Parameters**: `{ id: Id<"vaults"> }`
-- **Returns**: Vault document
-- **Throws**: If the vault does not exist or does not belong to the authenticated user
+- **Returns**: Vault document with a `role` field
+- **Throws**: If the vault does not exist or the user does not have at least viewer access
 
 ### Mutations
 
@@ -66,22 +66,24 @@ Creates a new vault for the authenticated user.
 
 Renames an existing vault.
 
-- **Auth**: Required
+- **Auth**: Owner only
 - **Parameters**: `{ id: Id<"vaults">, name: string }`
-- **Behavior**: Verifies ownership, then patches the vault name
+- **Behavior**: Verifies owner access via `verifyVaultAccess`, then patches the vault name
 
 #### `vaults.remove`
 
 Deletes a vault and all of its contents.
 
-- **Auth**: Required
+- **Auth**: Owner only
 - **Parameters**: `{ id: Id<"vaults"> }`
 - **Behavior**:
-  1. Verifies ownership
+  1. Verifies owner access via `verifyVaultAccess`
   2. Queries all notes in the vault → deletes each one
   3. Queries all folders in the vault → deletes each one
-  4. Deletes the vault document itself
-- **Cascade**: Full cascade deletion — no orphaned folders or notes remain
+  4. Queries all vault members → deletes each one
+  5. Queries all API keys for the vault → deletes each one
+  6. Deletes the vault document itself
+- **Cascade**: Full cascade deletion — no orphaned folders, notes, memberships, or API keys remain
 
 ### Internal Mutations
 
@@ -190,7 +192,9 @@ The vault selector is the first screen shown after authentication. It displays a
 | Element | Description |
 |---------|-------------|
 | Header | "Your Vaults" title with a "Sign Out" button (`LogOut` icon, calls `useClerk().signOut()`) |
-| Vault List | Vertical stack of vault cards, each showing the vault name with hover-reveal action buttons (Pencil for rename, Download for export as ZIP, Trash2 for delete) |
+| Pending Invitations | Shown at the top when the user has pending vault invitations. Each card shows vault name, role, and accept/decline buttons. Uses `PendingInvitations` component. |
+| Your Vaults | Vertical stack of owned vault cards with hover-reveal action buttons (Users for share, Pencil for rename, Download for export, Trash2 for delete) |
+| Shared with You | Separate section for vaults shared with the user. Shows role badges (editor/viewer). "Leave" button instead of delete. No rename or share buttons. |
 | Create Button | Full-width dashed-border card with `Plus` icon and "Create New Vault" text |
 | Import Button | Full-width dashed-border card with `Upload` icon and "Import Vault" text. Opens the Import Vault dialog. |
 | AI Onboarding Button | Full-width dashed-border card with `Sparkles` icon and "Set Up with AI" text. Opens the AI Onboarding Wizard dialog. |
@@ -199,25 +203,28 @@ The vault selector is the first screen shown after authentication. It displays a
 
 #### Interactions
 
-1. **Select Vault**: Clicking a vault card dispatches `SET_VAULT` action, which transitions the UI to the main `AppLayout`.
+1. **Select Vault**: Clicking a vault card dispatches `SET_VAULT` action with the vault's `role`, which transitions the UI to the main `AppLayout`.
 2. **Create Vault**: Clicking "Create New Vault" reveals an input field. Submitting calls `vaults.create` mutation.
-3. **Rename Vault**: Double-clicking the Pencil icon on a vault card enables inline editing. On blur or Enter, calls `vaults.rename`. Pressing Escape cancels the rename without saving.
-4. **Download Vault**: Clicking the Download icon fetches all folders and notes, builds a ZIP client-side using JSZip, and triggers a browser download of `{VaultName}.zip`. See [Download Vault](./download-vault.md) for the full flow.
-5. **Delete Vault**: Clicking the Trash2 icon triggers a native `window.confirm()` dialog. On confirm, calls `vaults.remove`.
-6. **Import Vault**: Clicking "Import Vault" opens `ImportVaultDialog`, a modal that guides the user through selecting a local Obsidian vault folder, previewing its contents, and importing all notes, folders, and settings. See [Import Vault](./import-vault.md) for the full flow.
-7. **AI Onboarding**: Clicking "Set Up with AI" opens the `OnboardingWizardDialog`, a multi-step wizard that asks about the user's knowledge management goals and generates a personalized starter vault using Claude. See the AI Onboarding Wizard section above.
+3. **Share Vault**: Clicking the Users icon on an owned vault card opens the `ShareVaultDialog` for inviting and managing collaborators.
+4. **Rename Vault**: Double-clicking the Pencil icon on an owned vault card enables inline editing. On blur or Enter, calls `vaults.rename`. Pressing Escape cancels the rename without saving.
+5. **Download Vault**: Clicking the Download icon fetches all folders and notes, builds a ZIP client-side using JSZip, and triggers a browser download of `{VaultName}.zip`. See [Download Vault](./download-vault.md) for the full flow.
+6. **Delete Vault**: Clicking the Trash2 icon on an owned vault triggers a native `window.confirm()` dialog. On confirm, calls `vaults.remove`.
+7. **Leave Vault**: Clicking "Leave" on a shared vault calls `sharing.removeCollaborator` with the user's own membership.
+8. **Accept/Decline Invite**: Pending invitations show accept (checkmark) and decline (X) buttons. Accept calls `sharing.acceptInvitation`; decline calls `sharing.removeCollaborator`.
+9. **Import Vault**: Clicking "Import Vault" opens `ImportVaultDialog`, a modal that guides the user through selecting a local Obsidian vault folder, previewing its contents, and importing all notes, folders, and settings. See [Import Vault](./import-vault.md) for the full flow.
+10. **AI Onboarding**: Clicking "Set Up with AI" opens the `OnboardingWizardDialog`, a multi-step wizard that asks about the user's knowledge management goals and generates a personalized starter vault using Claude. See the AI Onboarding Wizard section above.
 
 #### State Management
 
-- The selected vault ID is stored in the workspace context (`vaultId` field).
-- Dispatching `SET_VAULT` sets the vault and resets the entire workspace state (`...initialState`), including sidebar, right panel, search query, and split direction.
-- Dispatching `LEAVE_VAULT` clears the vault and resets the entire workspace state, returning to the selector.
+- The selected vault ID and role are stored in the workspace context (`vaultId` and `vaultRole` fields).
+- Dispatching `SET_VAULT` (with optional `role`) sets the vault and role, and resets the entire workspace state (`...initialState`), including sidebar, right panel, search query, and split direction.
+- Dispatching `LEAVE_VAULT` clears the vault, role, and resets the entire workspace state, returning to the selector.
 
 ### Vault Navigation
 
-- The sidebar header contains a **Vault Switcher** dropdown that lists all vaults. Clicking a different vault dispatches `SET_VAULT` to switch inline. A "Download Vault" option exports the current vault as a ZIP file. A "Manage Vaults..." option dispatches `LEAVE_VAULT` to return to the full-page vault selector.
-- The command palette provides both a "Download Vault" command (exports the current vault as ZIP) and a "Manage Vaults" command that dispatches `LEAVE_VAULT`.
-- Switching vaults clears all open tabs and panes, resetting the workspace state.
+- The sidebar header contains a **Vault Switcher** dropdown that lists all vaults with role badges on shared vaults. Clicking a different vault dispatches `SET_VAULT` (with role) to switch inline. Owners see "Share Vault..." and "Download Vault" options. Non-owners see "Leave Vault" instead of "Delete Vault". A "Manage Vaults..." option dispatches `LEAVE_VAULT` to return to the full-page vault selector.
+- The command palette provides "Download Vault", "Manage Vaults", and "Share Vault" (owner-only) commands.
+- Switching vaults clears all open tabs and panes, resetting the workspace state (including role).
 
 ## Download / Export Vault
 
@@ -235,12 +242,133 @@ Each vault can have multiple API keys for REST API and MCP server access. Keys a
 
 See [Authentication](./authentication.md#api-key-authentication-rest-api) for implementation details.
 
-## Ownership & Access Control
+## Sharing & Access Control
 
-- All vault operations verify that the requesting user owns the vault.
-- There is no sharing mechanism — vaults are strictly single-user.
-- The `by_user` index ensures only the owner's vaults are returned in queries.
-- API keys provide scoped external access to a single vault without exposing other vaults.
+Vaults support multi-user access with three roles:
+
+| Role | Source | Permissions |
+|------|--------|-------------|
+| **Owner** | Implicit — `vaults.userId` matches the user's `tokenIdentifier` | Full access: CRUD notes/folders, rename/delete vault, manage API keys, invite/remove collaborators |
+| **Editor** | Stored in `vaultMembers` table | Read + write notes and folders, use chat edit mode. Cannot rename/delete vault, manage sharing, or manage API keys. |
+| **Viewer** | Stored in `vaultMembers` table | Read-only. Can browse notes/folders and use Q&A chat. Editor locked to preview mode, no create/delete/drag-drop. |
+
+### Role Hierarchy
+
+Owner is never stored in the `vaultMembers` table — it is determined by matching `vaults.userId`. The role hierarchy is enforced by the shared auth module (`convex/auth.ts`):
+
+```
+owner (3) > editor (2) > viewer (1)
+```
+
+Each backend function specifies a `minimumRole` parameter to `verifyVaultAccess()`, which checks the caller's role against the hierarchy. See [Authentication](./authentication.md) for details.
+
+### Sharing Data Model
+
+#### `vaultMembers` table (`convex/schema.ts`)
+
+```typescript
+vaultMembers: defineTable({
+  vaultId: v.id("vaults"),
+  userId: v.string(),        // Clerk tokenIdentifier (empty string while pending)
+  email: v.string(),         // normalized lowercase, used for invite matching
+  role: v.union(v.literal("editor"), v.literal("viewer")),
+  invitedBy: v.string(),     // tokenIdentifier of inviter
+  invitedAt: v.number(),
+  status: v.union(v.literal("pending"), v.literal("accepted")),
+  acceptedAt: v.optional(v.number()),
+})
+  .index("by_vault", ["vaultId"])
+  .index("by_user", ["userId"])
+  .index("by_vault_user", ["vaultId", "userId"])
+  .index("by_email_status", ["email", "status"]),
+```
+
+### Invite Flow
+
+1. **Owner invites** by email via `sharing.inviteCollaborator` — creates a `vaultMembers` row with `userId: ""` and `status: "pending"`.
+2. **Invitee logs in** — `PendingInvitations` component queries `sharing.getPendingInvitations` using the user's email from the Clerk frontend SDK (`useUser().primaryEmailAddress.emailAddress`).
+3. **Invitee accepts** — `sharing.acceptInvitation` fills in the `userId` (Clerk `tokenIdentifier`) and sets `status: "accepted"`.
+4. **Vault appears** — `vaults.list` now returns shared vaults alongside owned vaults, each with a `role` field.
+
+Emails are normalized with `.toLowerCase().trim()` at every point of entry. Duplicate invites to the same email are rejected.
+
+### Sharing API
+
+**File:** `convex/sharing.ts`
+
+| Function | Type | Auth | Description |
+|----------|------|------|-------------|
+| `inviteCollaborator` | Mutation | Owner | Invite a user by email with a role |
+| `acceptInvitation` | Mutation | Invited user | Accept a pending invite (matches email) |
+| `getPendingInvitations` | Query | Authenticated | List pending invites for a given email |
+| `listCollaborators` | Query | Viewer+ | List all collaborators for a vault |
+| `updateCollaboratorRole` | Mutation | Owner | Change a collaborator's role |
+| `removeCollaborator` | Mutation | Owner or self | Remove a collaborator (or leave vault) |
+
+### Sharing UI
+
+#### ShareVaultDialog
+
+**File:** `src/components/vault/ShareVaultDialog.tsx`
+
+Modal dialog for vault owners to manage sharing:
+- Email input + role dropdown (editor/viewer) + invite button
+- Collaborator list with role dropdowns and remove buttons
+- Owner row shown first (non-editable)
+- Opened from the vault selector (Users icon), sidebar (Share Vault... action), or command palette
+
+#### PendingInvitations
+
+**File:** `src/components/vault/PendingInvitations.tsx`
+
+Shown at the top of the vault selector when the user has pending invites. Uses `useUser()` from Clerk to get the user's email. Each invite shows the vault name and role, with accept (checkmark) and decline (X) buttons.
+
+#### RoleBadge
+
+**File:** `src/components/vault/RoleBadge.tsx`
+
+Small reusable badge component. Editor = amber, viewer = muted gray. Hidden for owner role. Used in the vault selector, sidebar vault switcher, and app toolbar.
+
+### Permission Gating (Frontend)
+
+The `useVaultRole()` hook (`src/hooks/useVaultRole.ts`) derives boolean permission flags from the workspace state:
+
+| Flag | Owner | Editor | Viewer |
+|------|-------|--------|--------|
+| `canEdit` | yes | yes | no |
+| `canManage` | yes | no | no |
+| `canCreateNotes` | yes | yes | no |
+| `canDeleteNotes` | yes | yes | no |
+| `canEditNotes` | yes | yes | no |
+| `canManageFolders` | yes | yes | no |
+| `canDragDrop` | yes | yes | no |
+| `canDeleteVault` | yes | no | no |
+| `canShareVault` | yes | no | no |
+| `canRenameVault` | yes | no | no |
+
+These flags gate UI controls across the app:
+
+| Component | Gated Behavior |
+|-----------|---------------|
+| `FileExplorer` | Create/delete/upload/rename buttons hidden for viewers; drag-and-drop disabled |
+| `NoteView` | Forced preview mode for viewers; "Read-only" banner shown |
+| `TabBar` | Edit/preview toggle hidden for viewers |
+| `ChatPanel` | "Edit mode" toggle hidden for viewers |
+| `AppLayout` | Ctrl+E blocked for viewers; share button shown for owners only |
+| `SettingsDialog` | API Key Manager hidden for non-owners |
+| `CommandPalette` | "Share Vault" command owner-only; "Toggle Preview/Edit Mode" gated on canEditNotes |
+
+### Access Revocation
+
+When a collaborator is removed while they have the vault open, `vaults.get` returns `null` (their access is gone). A `useEffect` in `AppLayout` detects this and dispatches `LEAVE_VAULT`, returning the user to the vault selector.
+
+### Security Properties
+
+- Owner role is implicit from `vaults.userId` — it cannot be stored or faked in `vaultMembers`.
+- `vaultMembers.role` only allows `"editor"` or `"viewer"` — no privilege escalation to owner.
+- Pending memberships (`status: "pending"`) do not grant access — `getVaultRole` requires `status === "accepted"`.
+- A pending member has `userId: ""`, which cannot match any real Clerk `tokenIdentifier`.
+- API keys remain owner-only (they grant full programmatic access).
 
 ## Cascade Deletion Behavior
 
@@ -248,12 +376,15 @@ When a vault is deleted:
 
 ```
 Vault
- ├── Note 1      → deleted
- ├── Note 2      → deleted
- ├── Folder A    → deleted
- │   ├── Note 3  → deleted (via vault query, not folder cascade)
- │   └── Folder B→ deleted
- └── Note 4      → deleted
+ ├── Note 1        → deleted
+ ├── Note 2        → deleted
+ ├── Folder A      → deleted
+ │   ├── Note 3    → deleted (via vault query, not folder cascade)
+ │   └── Folder B  → deleted
+ ├── VaultMember 1 → deleted
+ ├── VaultMember 2 → deleted
+ ├── ApiKey 1      → deleted
+ └── Note 4        → deleted
 ```
 
-All notes and folders are queried by `vaultId` and deleted individually before the vault document itself is removed. This ensures no orphaned data remains.
+All notes, folders, vault members, and API keys are queried by `vaultId` and deleted individually before the vault document itself is removed. This ensures no orphaned data remains.

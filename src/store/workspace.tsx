@@ -9,6 +9,8 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 // --- Types ---
 
+export type VaultRole = "owner" | "editor" | "viewer";
+
 interface Tab {
   id: string;
   type: "note" | "graph";
@@ -24,6 +26,7 @@ interface Pane {
 
 export interface WorkspaceState {
   vaultId: Id<"vaults"> | null;
+  vaultRole: VaultRole | null;
   panes: Pane[];
   activePaneId: string;
   splitDirection: "horizontal" | "vertical" | null;
@@ -33,7 +36,7 @@ export interface WorkspaceState {
 }
 
 export type Action =
-  | { type: "SET_VAULT"; vaultId: Id<"vaults"> }
+  | { type: "SET_VAULT"; vaultId: Id<"vaults">; role?: VaultRole }
   | { type: "LEAVE_VAULT" }
   | { type: "OPEN_NOTE"; noteId: Id<"notes"> }
   | { type: "OPEN_GRAPH" }
@@ -53,6 +56,7 @@ const defaultPane: Pane = { id: "pane-1", tabs: [], activeTabId: null };
 
 export const initialState: WorkspaceState = {
   vaultId: null,
+  vaultRole: null,
   panes: [defaultPane],
   activePaneId: "pane-1",
   splitDirection: null,
@@ -71,6 +75,7 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return {
         ...initialState,
         vaultId: action.vaultId,
+        vaultRole: action.role ?? "owner",
         panes: [{ id: "pane-1", tabs: [], activeTabId: null }],
         activePaneId: "pane-1",
       };
@@ -256,4 +261,12 @@ export function getActiveNoteId(state: WorkspaceState): Id<"notes"> | null {
   const tab = pane.tabs.find((t) => t.id === pane.activeTabId);
   if (!tab || tab.type !== "note") return null;
   return tab.noteId ?? null;
+}
+
+export function canEdit(state: WorkspaceState): boolean {
+  return state.vaultRole === "owner" || state.vaultRole === "editor";
+}
+
+export function isOwner(state: WorkspaceState): boolean {
+  return state.vaultRole === "owner";
 }
