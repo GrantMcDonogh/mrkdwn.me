@@ -1,21 +1,22 @@
+import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useMemo } from "react";
 import { preprocessForPDF } from "../../utils/exportNoteToPDF";
+import { positionPopup } from "./wikiLinks";
 
 interface Props {
-  title: string;
   content: string | null;
-  anchorRect: DOMRect;
-  containerRect: DOMRect;
+  mouseX: number;
+  mouseY: number;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 }
 
 export default function LinkPreviewPopup({
   content,
-  anchorRect,
-  containerRect,
+  mouseX,
+  mouseY,
   onMouseEnter,
   onMouseLeave,
 }: Props) {
@@ -26,18 +27,19 @@ export default function LinkPreviewPopup({
     return preprocessForPDF(truncated);
   }, [content]);
 
-  // Position above the hovered link, relative to the container
-  const left = anchorRect.left - containerRect.left;
-  const bottom = containerRect.bottom - anchorRect.top + 4;
+  // Use a callback ref to position the popup after it mounts,
+  // measuring actual size for accurate edge detection.
+  const refCallback = (el: HTMLDivElement | null) => {
+    if (el) positionPopup(el, mouseX, mouseY);
+  };
 
-  return (
+  return createPortal(
     <div
+      ref={refCallback}
       className="link-preview-popup"
       style={{
-        position: "absolute",
-        left: Math.max(0, Math.min(left, containerRect.width - 450)),
-        bottom,
-        zIndex: 50,
+        position: "fixed",
+        zIndex: 9999,
       }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -53,6 +55,7 @@ export default function LinkPreviewPopup({
           </ReactMarkdown>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }

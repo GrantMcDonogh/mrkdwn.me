@@ -67,9 +67,9 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
 
   const [hoverState, setHoverState] = useState<{
     title: string;
-    anchorRect: DOMRect;
+    mouseX: number;
+    mouseY: number;
   } | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -108,9 +108,9 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
               onMouseEnter={(e) => {
                 clearDismissTimeout();
                 clearHoverTimeout();
-                const rect = (e.target as HTMLElement).getBoundingClientRect();
+                const mx = e.clientX, my = e.clientY;
                 hoverTimeoutRef.current = setTimeout(() => {
-                  setHoverState({ title, anchorRect: rect });
+                  setHoverState({ title, mouseX: mx, mouseY: my });
                 }, 300);
               }}
               onMouseLeave={() => {
@@ -168,8 +168,7 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
 
   return (
     <div
-      ref={containerRef}
-      className="markdown-preview flex-1 overflow-auto relative"
+      className="markdown-preview flex-1 overflow-auto"
       onDoubleClick={onSwitchToEdit}
     >
       <div className="px-6 py-4 max-w-none">
@@ -181,12 +180,11 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
           {processedContent}
         </ReactMarkdown>
       </div>
-      {hoverState && containerRef.current && (
+      {hoverState && (
         <LinkPreviewPopup
-          title={hoverState.title}
-          content={hoveredNoteContent === null ? null : (hoveredNoteContent ?? null)}
-          anchorRect={hoverState.anchorRect}
-          containerRect={containerRef.current.getBoundingClientRect()}
+          content={hoveredNoteContent ?? null}
+          mouseX={hoverState.mouseX}
+          mouseY={hoverState.mouseY}
           onMouseEnter={clearDismissTimeout}
           onMouseLeave={() => {
             setHoverState(null);

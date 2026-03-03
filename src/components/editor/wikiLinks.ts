@@ -5,8 +5,6 @@ import {
   type EditorView,
   type ViewUpdate,
   WidgetType,
-  hoverTooltip,
-  type Tooltip,
 } from "@codemirror/view";
 import { RangeSetBuilder } from "@codemirror/state";
 import type { CompletionContext, CompletionResult } from "@codemirror/autocomplete";
@@ -114,71 +112,168 @@ export const wikiLinkPlugin = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations }
 );
 
-// Hover preview tooltip for wiki links
-export const wikiLinkHoverPreview = hoverTooltip(
-  (view: EditorView, pos: number): Tooltip | null => {
-    if (!getNoteContent) return null;
+// --- Hover preview popup (editor mode) ---
+// Manages its own fixed-position DOM element on document.body,
+// positioned at the mouse cursor with smart viewport edge detection.
 
-    const line = view.state.doc.lineAt(pos);
-    const regex = /\[\[([^\]]+)\]\]/g;
-    let match;
-    regex.lastIndex = 0;
+let hoverPopup: HTMLElement | null = null;
+let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+let dismissTimer: ReturnType<typeof setTimeout> | null = null;
 
-    while ((match = regex.exec(line.text)) !== null) {
-      const start = line.from + match.index;
-      const end = start + match[0].length;
+function clearHoverTimer() {
+  if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+}
 
-      if (pos >= start && pos <= end) {
-        const inner = match[1]!;
-        let title = inner;
-        const pipeIdx = inner.indexOf("|");
-        const hashIdx = inner.indexOf("#");
+function clearDismissTimer() {
+  if (dismissTimer) { clearTimeout(dismissTimer); dismissTimer = null; }
+}
 
-        if (pipeIdx !== -1) {
-          title = inner.substring(0, pipeIdx);
-        } else if (hashIdx !== -1) {
-          title = inner.substring(0, hashIdx);
-        }
+function dismissPopup() {
+  clearDismissTimer();
+  if (hoverPopup) { hoverPopup.remove(); hoverPopup = null; }
+}
 
-        const content = getNoteContent(title);
+export function positionPopup(
+  el: HTMLElement,
+  mouseX: number,
+  mouseY: number,
+) {
+  const offset = 12;
+  const margin = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const rect = el.getBoundingClientRect();
 
-        return {
-          pos: start,
-          end,
-          above: true,
-          create() {
-            const container = document.createElement("div");
-            container.className = "link-preview-popup";
+  let left = mouseX + offset;
+  let top = mouseY + offset;
 
-            if (content === null) {
-              const empty = document.createElement("div");
-              empty.className = "link-preview-empty";
-              empty.textContent = "Note not found";
-              container.appendChild(empty);
-            } else if (content.trim() === "") {
-              const empty = document.createElement("div");
-              empty.className = "link-preview-empty";
-              empty.textContent = "Empty note";
-              container.appendChild(empty);
-            } else {
-              const truncated = content.length > 1500 ? content.slice(0, 1500) + "..." : content;
-              const cleaned = preprocessForPDF(truncated);
-              const html = marked.parse(cleaned, { async: false }) as string;
-              const contentDiv = document.createElement("div");
-              contentDiv.className = "link-preview-content markdown-preview";
-              contentDiv.innerHTML = html;
-              container.appendChild(contentDiv);
-            }
+  if (left + rect.width > vw - margin) left = mouseX - rect.width - offset;
+  if (left < margin) left = margin;
+  if (top + rect.height > vh - margin) top = mouseY - rect.height - offset;
+  if (top < margin) top = margin;
 
-            return { dom: container };
-          },
-        };
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
+}
+
+function showPopup(title: string, mouseX: number, mouseY: number) {
+  dismissPopup();
+  if (!getNoteContent) return;
+
+  const content = getNoteContent(title);
+  const container = document.createElement("div");
+  container.className = "link-preview-popup";
+  container.style.position = "fixed";
+  container.style.zIndex = "9999";
+  container.style.visibility = "hidden";
+
+  if (content === null) {
+    const el = document.createElement("div");
+    el.className = "link-preview-empty";
+    el.textContent = "Note not found";
+    container.appendChild(el);
+  } else if (content.trim() === "") {
+    const el = document.createElement("div");
+    el.className = "link-preview-empty";
+    el.textContent = "Empty note";
+    container.appendChild(el);
+  } else {
+    const truncated = content.length > 1500 ? content.slice(0, 1500) + "..." : content;
+    const cleaned = preprocessForPDF(truncated);
+    const html = marked.parse(cleaned, { async: false }) as string;
+    const contentDiv = document.createElement("div");
+    contentDiv.className = "link-preview-content markdown-preview";
+    contentDiv.innerHTML = html;
+    container.appendChild(contentDiv);
+  }
+
+  container.addEventListener("mouseenter", clearDismissTimer);
+  container.addEventListener("mouseleave", () => {
+    dismissTimer = setTimeout(dismissPopup, 200);
+  });
+
+  document.body.appendChild(container);
+  hoverPopup = container;
+
+  // Measure actual size then position with edge detection
+  positionPopup(container, mouseX, mouseY);
+  container.style.visibility = "";
+}
+
+function getTitleAtPos(view: EditorView, pos: number): string | null {
+  const line = view.state.doc.lineAt(pos);
+  const regex = /\[\[([^\]]+)\]\]/g;
+  let match;
+  while ((match = regex.exec(line.text)) !== null) {
+    const start = line.from + match.index;
+    const end = start + match[0].length;
+    if (pos >= start && pos <= end) {
+      const inner = match[1]!;
+      let title = inner;
+      const pipeIdx = inner.indexOf("|");
+      const hashIdx = inner.indexOf("#");
+      if (pipeIdx !== -1) title = inner.substring(0, pipeIdx);
+      else if (hashIdx !== -1) title = inner.substring(0, hashIdx);
+      return title;
+    }
+  }
+  return null;
+}
+
+export const wikiLinkHoverPreview = ViewPlugin.fromClass(
+  class {
+    private lastTitle: string | null = null;
+
+    constructor(private view: EditorView) {
+      this.view.dom.addEventListener("mousemove", this.onMouseMove);
+      this.view.dom.addEventListener("mouseleave", this.onMouseLeave);
+    }
+
+    private onMouseMove = (e: MouseEvent) => {
+      if (hoverPopup?.contains(e.target as Node)) return;
+
+      const pos = this.view.posAtCoords({ x: e.clientX, y: e.clientY });
+      if (pos === null) { this.handleLeaveLink(); return; }
+
+      const title = getTitleAtPos(this.view, pos);
+      if (!title) { this.handleLeaveLink(); return; }
+
+      if (title !== this.lastTitle) {
+        clearHoverTimer();
+        clearDismissTimer();
+        dismissPopup();
+        this.lastTitle = title;
+        const mx = e.clientX, my = e.clientY;
+        hoverTimer = setTimeout(() => showPopup(title, mx, my), 300);
+      } else {
+        clearDismissTimer();
+      }
+    };
+
+    private onMouseLeave = () => {
+      clearHoverTimer();
+      this.lastTitle = null;
+      dismissTimer = setTimeout(dismissPopup, 200);
+    };
+
+    private handleLeaveLink() {
+      clearHoverTimer();
+      if (this.lastTitle) {
+        this.lastTitle = null;
+        dismissTimer = setTimeout(dismissPopup, 200);
       }
     }
 
-    return null;
-  },
-  { hoverTime: 300 }
+    update(_update: ViewUpdate) {}
+
+    destroy() {
+      this.view.dom.removeEventListener("mousemove", this.onMouseMove);
+      this.view.dom.removeEventListener("mouseleave", this.onMouseLeave);
+      clearHoverTimer();
+      clearDismissTimer();
+      dismissPopup();
+    }
+  }
 );
 
 // Autocomplete: triggered by [[
