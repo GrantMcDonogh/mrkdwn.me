@@ -137,3 +137,7 @@ Includes request/response examples, authentication details, and error codes.
 ### Link Preview Popup on Wiki Link Hover — Mar 3, 2026
 Hovering over a `[[wiki link]]` in either editor or preview mode shows a popup with the linked note's rendered markdown content.
 Popup appears at the mouse cursor with smart viewport edge detection — flips direction near screen edges and dismisses cleanly on click or mouse-out.
+
+### Markdown Rendering in Chat Messages — Mar 3, 2026
+AI chat responses are now rendered as formatted markdown (headings, bold, lists, code blocks) instead of plain text.
+`[[Wiki links]]` in responses are clickable and navigate to the referenced note. Both chat modes instruct the AI to use wiki link syntax when citing notes.

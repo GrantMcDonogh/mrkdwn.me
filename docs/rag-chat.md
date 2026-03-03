@@ -154,7 +154,7 @@ Both endpoints echo the request's `Origin` header in `Access-Control-Allow-Origi
 The system prompt instructs Claude to:
 
 - Answer **only** from the provided vault notes
-- Cite note titles when referencing content
+- Use `[[Note Title]]` wiki link syntax when referencing note titles (rendered as clickable links in the chat UI)
 - Say "I don't have enough information in your notes to answer that" when context is insufficient
 - Note discrepancies between notes
 - Use markdown formatting in responses
@@ -164,13 +164,13 @@ The system prompt instructs Claude to:
 
 The system prompt instructs the AI to:
 
-- Answer questions about vault notes (same as Q&A mode)
+- Answer questions about vault notes, using `[[Note Title]]` wiki link syntax when referencing note titles
 - Edit existing notes when asked, using `````edit:Note Title` blocks
 - Create new notes when asked, using `````create:New Note Title` blocks
 - Output **complete replacement content** (not partial diffs) inside edit blocks
 - Explain changes in natural language before the edit/create block
 - Preserve parts of notes the user didn't ask to change
-- Use `[[Wiki Link]]` syntax in note content
+- Use `[[Wiki Link]]` syntax to link between notes in note content
 
 ## Edit Block Syntax
 
@@ -238,10 +238,16 @@ The chat panel automatically selects the endpoint based on the user's OpenRouter
 
 **File:** `src/components/chat/ChatMessage.tsx`
 
-Renders individual user or assistant messages with appropriate styling. For assistant messages in edit mode:
+Renders individual user or assistant messages with appropriate styling.
 
-- The message text is displayed with edit blocks stripped out (via `stripEditBlocks`)
-- Each parsed `EditBlock` is rendered as an `EditBlockCard` below the message text
+**User messages** are rendered as plain text with `whitespace-pre-wrap`.
+
+**Assistant messages** are rendered as formatted markdown via `ReactMarkdown` + `remarkGfm`:
+
+- Content is preprocessed by `preprocessContent()` (from `src/utils/preprocessMarkdown.ts`) which converts `[[Wiki Link]]` syntax to clickable internal links and `#tags` to styled spans — the same utility used by the note preview.
+- The custom `components.a` handler intercepts `wikilink://` URLs and navigates to the linked note (case-insensitive title match) via the `onNavigateNote` callback. Regular URLs open in a new tab.
+- The wrapper div uses both `chat-message-markdown` and `markdown-preview` CSS classes — `markdown-preview` provides the base markdown styles, `chat-message-markdown` overrides font sizes for the smaller chat panel.
+- Edit blocks are stripped from the displayed text (via `stripEditBlocks`) and each parsed `EditBlock` is rendered as an `EditBlockCard` below the message.
 
 ### EditBlockCard
 
@@ -327,7 +333,8 @@ The OpenRouter API key for edit mode is stored per-user in the `userSettings` da
 | `convex/testKey.ts` | OpenRouter API key validation endpoint |
 | `convex/userSettings.ts` | OpenRouter key CRUD operations |
 | `src/components/chat/ChatPanel.tsx` | Chat panel UI with mode switching |
-| `src/components/chat/ChatMessage.tsx` | Message rendering with edit block support |
+| `src/components/chat/ChatMessage.tsx` | Message rendering with markdown + wiki link support |
+| `src/utils/preprocessMarkdown.ts` | Shared utility converting `[[wiki links]]` and `#tags` to markdown links |
 | `src/components/chat/EditBlockCard.tsx` | Interactive edit/create block card |
 | `src/components/chat/DiffView.tsx` | Line-by-line diff viewer |
 | `src/components/chat/useChatStream.ts` | Streaming fetch hook with edit block parsing |

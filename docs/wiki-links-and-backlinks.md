@@ -82,9 +82,11 @@ Uses a custom `ViewPlugin` that manages its own `position: fixed` DOM element ap
 
 The content provider is injected by `MarkdownEditor` via `setNoteContentProvider()`, following the same module-level callback pattern as `setWikiLinkNavigator` and `setNoteListProvider`.
 
-### Preview Mode (React)
+### Preview Mode (React) & Chat Messages
 
-**Files:** `src/components/editor/MarkdownPreview.tsx`, `src/components/editor/LinkPreviewPopup.tsx`
+**Files:** `src/components/editor/MarkdownPreview.tsx`, `src/components/editor/LinkPreviewPopup.tsx`, `src/components/chat/ChatMessage.tsx`
+
+Wiki links are clickable in both the note preview and AI chat responses. Both use the shared `preprocessContent()` utility (`src/utils/preprocessMarkdown.ts`) to convert `[[Title]]` syntax into `wikilink://` markdown links, and a custom `ReactMarkdown` `components.a` handler to intercept clicks and navigate via `OPEN_NOTE` dispatch.
 
 Uses React state and mouse event handlers on the wiki link `<a>` elements:
 
