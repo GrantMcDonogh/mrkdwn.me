@@ -62,6 +62,61 @@ When a user clicks a wiki link:
 
 **Implementation**: Uses `@codemirror/autocomplete` with a custom completion source registered for the `[[` context.
 
+## Link Preview Popup
+
+Hovering over a wiki link shows a popup with rendered markdown content of the linked note, allowing users to peek at linked notes without navigating away.
+
+### Editor Mode (CodeMirror)
+
+**File:** `src/components/editor/wikiLinks.ts`
+
+Uses CodeMirror's built-in `hoverTooltip` from `@codemirror/view`. The tooltip source function:
+
+1. Receives a document position and scans the line for `[[...]]` matches.
+2. Checks if the cursor position falls within a wiki link match.
+3. Parses the title (handling `|alias` and `#heading` — same logic as `buildDecorations`).
+4. Calls the injected `getNoteContent(title)` callback to retrieve the linked note's content.
+5. Truncates content to 1500 characters for performance.
+6. Strips wiki links to plain text using `preprocessForPDF()` from `src/utils/exportNoteToPDF.ts`.
+7. Renders HTML synchronously via `marked.parse()` (avoids React mounting complexity inside CodeMirror's imperative DOM).
+8. Returns a `Tooltip` with `above: true` positioning.
+
+The content provider is injected by `MarkdownEditor` via `setNoteContentProvider()`, following the same module-level callback pattern as `setWikiLinkNavigator` and `setNoteListProvider`.
+
+### Preview Mode (React)
+
+**Files:** `src/components/editor/MarkdownPreview.tsx`, `src/components/editor/LinkPreviewPopup.tsx`
+
+Uses React state and mouse event handlers on the wiki link `<a>` elements:
+
+1. `onMouseEnter` starts a 300ms timeout, then sets `hoverState` with the link title and anchor `DOMRect`.
+2. `onMouseLeave` starts a 200ms dismiss timeout (allows the user to move their mouse into the popup).
+3. The `LinkPreviewPopup` component renders conditionally when `hoverState` is set.
+4. The popup's own `onMouseEnter` cancels the dismiss timeout; `onMouseLeave` dismisses the popup.
+5. Content is rendered via `ReactMarkdown` + `remarkGfm` for consistency with the main preview.
+
+### Shared Behavior
+
+| Behavior | Detail |
+|----------|--------|
+| Show delay | 300ms hover before popup appears |
+| Dismiss | Moving mouse away from both link and popup dismisses it |
+| Link to popup | Mouse can move from link directly into popup without flickering |
+| Content truncation | Capped at 1500 characters |
+| Wiki link stripping | `preprocessForPDF()` converts `[[Title\|Alias]]` to plain text in popup content |
+| Missing note | Shows "Note not found" message |
+| Empty note | Shows "Empty note" message |
+| Click passthrough | Clicking a wiki link still navigates (unchanged behavior) |
+
+### Styling
+
+Popup styles are defined in `src/index.css` under `.link-preview-popup`:
+
+- Dark background (`var(--color-obsidian-bg-secondary)`) with border and box shadow
+- Max dimensions: 450px wide, 320px tall with scrollable overflow
+- Smaller heading sizes inside the popup (h1: 1.4em, h2: 1.2em, h3/h4: 1.05em)
+- CodeMirror tooltip wrapper override: `.cm-tooltip-hover:has(.link-preview-popup)` clears default tooltip styling
+
 ## Backlinks
 
 ### Concept

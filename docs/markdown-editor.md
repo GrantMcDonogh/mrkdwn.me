@@ -18,8 +18,9 @@ The system uses a mode-per-tab approach. Each note tab tracks its own `mode` ("p
 | `NoteView.tsx` | Wrapper: renders preview or editor based on tab mode |
 | `MarkdownPreview.tsx` | Read-only markdown rendering with wiki link/tag support |
 | `MarkdownEditor.tsx` | CodeMirror editor component, auto-save |
-| `wikiLinks.ts` | Wiki link detection, rendering, autocomplete (editor mode) |
+| `wikiLinks.ts` | Wiki link detection, rendering, autocomplete, hover preview (editor mode) |
 | `livePreview.ts` | Live preview decorations for Markdown syntax (editor mode) |
+| `LinkPreviewPopup.tsx` | Hover preview popup for wiki links (preview mode) |
 
 ## Preview/Edit Mode Toggle
 
@@ -54,7 +55,7 @@ The preview uses custom `react-markdown` component overrides:
 
 | Protocol | Rendering |
 |----------|-----------|
-| `wikilink://` | Clickable link that dispatches `OPEN_NOTE` to navigate to the linked note |
+| `wikilink://` | Clickable link that dispatches `OPEN_NOTE` to navigate; shows hover preview popup |
 | `tag://` | Styled `<span>` with accent color background |
 | Regular URLs | Standard `<a>` tag with `target="_blank"` |
 
@@ -78,6 +79,7 @@ The editor is configured with the following CodeMirror extensions:
 | Search keymap | `@codemirror/search` | Find/replace functionality |
 | Autocomplete | `@codemirror/autocomplete` | Wiki link completion |
 | Wiki link plugin | `wikiLinks.ts` | Renders and navigates wiki links |
+| Wiki link hover preview | `wikiLinks.ts` | Shows popup with linked note content on hover |
 | Live preview plugin | `livePreview.ts` | Inline Markdown formatting preview |
 | Update listener | `@codemirror/view` | Triggers auto-save on changes |
 
