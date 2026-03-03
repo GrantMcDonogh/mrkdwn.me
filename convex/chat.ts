@@ -66,10 +66,11 @@ export const chat = httpAction(async (ctx, request) => {
       system:
         "You are a helpful assistant that answers questions based on the user's vault notes. " +
         "Answer ONLY from the provided notes. Use [[Note Title]] wiki link syntax when referencing note titles. " +
-        "Keep answers short and concise — a few sentences at most — and link to source notes with [[Note Title]] so the user can read more. " +
-        "Only give detailed, longer responses when the user explicitly asks for detail or elaboration. " +
+        "CRITICAL: Be extremely brief. Reply in 1-3 short sentences max, then link to the relevant source notes with [[Note Title]] so the user can read the details themselves. " +
+        "Do NOT summarize or repeat note content at length. Just answer the question directly and point to the notes. " +
+        "Only give longer, detailed responses if the user explicitly asks (e.g. \"explain in detail\", \"give me more\"). " +
         'If the notes don\'t contain relevant information, say "I don\'t have enough information in your notes to answer that." ' +
-        "Use markdown formatting. Note any discrepancies between notes.",
+        "Use markdown formatting.",
       messages: [
         {
           role: "user",
