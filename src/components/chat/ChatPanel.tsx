@@ -8,9 +8,10 @@ import SettingsDialog from "../settings/SettingsDialog";
 import { Send, Trash2, Settings, Sparkles } from "lucide-react";
 
 export default function ChatPanel() {
-  const [state] = useWorkspace();
+  const [state, dispatch] = useWorkspace();
   const vaultId = state.vaultId!;
   const activeNoteId = getActiveNoteId(state);
+  const allNotes = useQuery(api.notes.list, { vaultId });
   const { messages, isStreaming, sendMessage, clearMessages, updateBlockStatus } =
     useChatStream();
   const [input, setInput] = useState("");
@@ -101,6 +102,8 @@ export default function ChatPanel() {
               onBlockStatusChange={(blockIndex, status) =>
                 updateBlockStatus(i, blockIndex, status)
               }
+              allNotes={msg.role === "assistant" ? allNotes : undefined}
+              onNavigateNote={msg.role === "assistant" ? (noteId) => dispatch({ type: "OPEN_NOTE", noteId }) : undefined}
             />
           ))
         )}

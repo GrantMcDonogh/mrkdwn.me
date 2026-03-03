@@ -327,3 +327,16 @@ body {
 .markdown-preview del {
   color: var(--color-obsidian-text-muted);
 }
+
+/* Chat message markdown — smaller scale than note preview */
+.chat-message-markdown {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.chat-message-markdown p { margin: 0.3em 0; }
+.chat-message-markdown p:first-child { margin-top: 0; }
+.chat-message-markdown p:last-child { margin-bottom: 0; }
+.chat-message-markdown pre { font-size: 12px; }
+.chat-message-markdown h1 { font-size: 1.3em; }
+.chat-message-markdown h2 { font-size: 1.15em; }
+.chat-message-markdown h3, .chat-message-markdown h4 { font-size: 1.05em; }

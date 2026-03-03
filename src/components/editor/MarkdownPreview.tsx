@@ -7,43 +7,11 @@ import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
 import type { Id } from "../../../convex/_generated/dataModel";
 import LinkPreviewPopup from "./LinkPreviewPopup";
+import { preprocessContent } from "../../utils/preprocessMarkdown";
 
 interface Props {
   noteId: Id<"notes">;
   onSwitchToEdit: () => void;
-}
-
-/**
- * Pre-process markdown content to convert wiki links and tags
- * into standard markdown links, while preserving code blocks.
- */
-function preprocessContent(content: string): string {
-  // Split on fenced code blocks and inline code to avoid transforming them
-  const parts = content.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
-
-  return parts
-    .map((part, i) => {
-      // Odd indices are code blocks/inline code — leave them alone
-      if (i % 2 === 1) return part;
-
-      // Convert wiki links: [[Title|Alias]] or [[Title]]
-      let processed = part.replace(
-        /\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g,
-        (_match, title: string, alias?: string) => {
-          const display = alias ?? title;
-          return `[${display}](wikilink://${encodeURIComponent(title)})`;
-        }
-      );
-
-      // Convert tags: #tag (not inside headings at line start)
-      processed = processed.replace(
-        /(?<=\s|^)#([a-zA-Z][\w-/]*)/gm,
-        (_match, tag: string) => `[#${tag}](tag://${tag})`
-      );
-
-      return processed;
-    })
-    .join("");
 }
 
 export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {

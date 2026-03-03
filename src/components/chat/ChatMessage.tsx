@@ -1,8 +1,18 @@
+import { useMemo } from "react";
 import { User, Bot } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 import type { EditBlock } from "../../lib/parseEditBlocks";
 import { stripEditBlocks } from "../../lib/parseEditBlocks";
 import EditBlockCard from "./EditBlockCard";
+import { preprocessContent } from "../../utils/preprocessMarkdown";
 import type { Id } from "../../../convex/_generated/dataModel";
+
+interface NoteRef {
+  _id: Id<"notes">;
+  title: string;
+}
 
 interface Props {
   role: "user" | "assistant";
@@ -10,6 +20,8 @@ interface Props {
   editBlocks?: EditBlock[];
   vaultId?: Id<"vaults">;
   onBlockStatusChange?: (blockIndex: number, status: "applied" | "dismissed") => void;
+  allNotes?: NoteRef[] | null;
+  onNavigateNote?: (noteId: Id<"notes">) => void;
 }
 
 export default function ChatMessage({
@@ -18,9 +30,50 @@ export default function ChatMessage({
   editBlocks,
   vaultId,
   onBlockStatusChange,
+  allNotes,
+  onNavigateNote,
 }: Props) {
   const displayContent =
     editBlocks && editBlocks.length > 0 ? stripEditBlocks(content) : content;
+
+  const processedContent = useMemo(
+    () => (role === "assistant" && displayContent ? preprocessContent(displayContent) : ""),
+    [role, displayContent]
+  );
+
+  const components: Components = useMemo(
+    () => ({
+      a: ({ href, children }) => {
+        if (href?.startsWith("wikilink://")) {
+          const title = decodeURIComponent(href.replace("wikilink://", ""));
+          return (
+            <a
+              className="markdown-preview-wikilink"
+              onClick={(e) => {
+                e.preventDefault();
+                if (!allNotes || !onNavigateNote) return;
+                const target = allNotes.find(
+                  (n) => n.title.toLowerCase() === title.toLowerCase()
+                );
+                if (target) onNavigateNote(target._id);
+              }}
+            >
+              {children}
+            </a>
+          );
+        }
+        if (href?.startsWith("tag://")) {
+          return <span className="markdown-preview-tag">{children}</span>;
+        }
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        );
+      },
+    }),
+    [allNotes, onNavigateNote]
+  );
 
   return (
     <div
@@ -43,13 +96,33 @@ export default function ChatMessage({
         <p className="text-xs font-medium text-obsidian-text-muted mb-1">
           {role === "user" ? "You" : "Assistant"}
         </p>
-        <div className="text-sm text-obsidian-text whitespace-pre-wrap break-words">
-          {displayContent || (
-            <span className="text-obsidian-text-muted animate-pulse">
-              Thinking...
-            </span>
-          )}
-        </div>
+        {role === "assistant" ? (
+          displayContent ? (
+            <div className="chat-message-markdown markdown-preview">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={components}
+                urlTransform={(url) => url}
+              >
+                {processedContent}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <div className="text-sm text-obsidian-text">
+              <span className="text-obsidian-text-muted animate-pulse">
+                Thinking...
+              </span>
+            </div>
+          )
+        ) : (
+          <div className="text-sm text-obsidian-text whitespace-pre-wrap break-words">
+            {displayContent || (
+              <span className="text-obsidian-text-muted animate-pulse">
+                Thinking...
+              </span>
+            )}
+          </div>
+        )}
         {editBlocks &&
           vaultId &&
           editBlocks.map((block, i) => (
