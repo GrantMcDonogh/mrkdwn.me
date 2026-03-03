@@ -49,7 +49,10 @@
       "Bash(cd D:/Dev/mrkdwn.me/mcp-server && npm login 2>&1)",
       "Bash(npm whoami:*)",
       "Bash(xargs grep:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot",
+      "mcp__plugin_playwright_playwright__browser_run_code",
+      "mcp__plugin_playwright_playwright__browser_close"
     ]
   },
   "mcpServers": {
