@@ -94,6 +94,9 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `parentId` | `v.optional(v.id("folders"))` | Parent folder (undefined = root) |
 | `vaultId` | `v.id("vaults")` | Foreign key to vault |
 | `order` | `v.number()` | Sort order among siblings |
+| `isDeleted` | `v.optional(v.boolean())` | Soft-delete flag (`true` = deleted, `undefined` = active) |
+| `deletedAt` | `v.optional(v.number())` | Deletion timestamp |
+| `deletedBy` | `v.optional(v.string())` | `tokenIdentifier` of the user who deleted it |
 
 **Indexes:**
 - `by_vault` → `["vaultId"]` — All folders in a vault
@@ -111,6 +114,10 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `order` | `v.number()` | Sort order among siblings |
 | `createdAt` | `v.number()` | Creation timestamp |
 | `updatedAt` | `v.number()` | Last modification timestamp |
+| `updatedBy` | `v.optional(v.string())` | `tokenIdentifier` of user who last edited |
+| `isDeleted` | `v.optional(v.boolean())` | Soft-delete flag (`true` = deleted, `undefined` = active) |
+| `deletedAt` | `v.optional(v.number())` | Deletion timestamp |
+| `deletedBy` | `v.optional(v.string())` | `tokenIdentifier` of the user who deleted it |
 
 **Indexes:**
 - `by_vault` → `["vaultId"]` — All notes in a vault
@@ -182,7 +189,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `vaults.get` | Query | `{ id }` | Viewer+ | `Vault & { role }` | Get vault with access check |
 | `vaults.create` | Mutation | `{ name }` | Authenticated | `Id<"vaults">` | Create vault |
 | `vaults.rename` | Mutation | `{ id, name }` | Owner | — | Rename vault |
-| `vaults.remove` | Mutation | `{ id }` | Owner | — | Delete vault + all contents + members + API keys |
+| `vaults.remove` | Mutation | `{ id }` | Owner | — | Delete vault + all contents + members + API keys + versions + audit log |
 | `vaults.importCreateVault` | Internal Mutation | `{ name, userId, settings? }` | Internal | `Id<"vaults">` | Create vault (called from import action) |
 
 ### Folder Operations
@@ -195,7 +202,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `folders.create` | Mutation | `{ name, vaultId, parentId? }` | `Id<"folders">` | Create folder |
 | `folders.rename` | Mutation | `{ id, name }` | — | Rename folder |
 | `folders.move` | Mutation | `{ id, parentId? }` | — | Move folder to new parent |
-| `folders.remove` | Mutation | `{ id }` | — | Delete folder (children promoted) |
+| `folders.remove` | Mutation | `{ id }` | — | Cascading soft-delete folder + all descendants and contained notes |
 | `folders.importBatch` | Internal Mutation | `{ folders, parentIdMap }` | `Record<string, string>` | Batch-create folders with tempId mapping (called from import action) |
 
 ### Note Operations
@@ -210,7 +217,7 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 | `notes.update` | Mutation | `{ id, content }` | — | Update note content |
 | `notes.rename` | Mutation | `{ id, title }` | — | Rename note + update wiki link references |
 | `notes.move` | Mutation | `{ id, folderId? }` | — | Move note to folder |
-| `notes.remove` | Mutation | `{ id }` | — | Delete note |
+| `notes.remove` | Mutation | `{ id }` | — | Soft-delete note (sets `isDeleted`, `deletedAt`, `deletedBy`; creates version snapshot) |
 | `notes.search` | Query | `{ vaultId, query }` | `Note[]` | Full-text search via dual-index (title + content), merged, deduped, max 20 results |
 | `notes.getBacklinks` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get notes linking to this note |
 | `notes.getUnlinkedMentions` | Query | `{ noteId }` | `{ noteId, noteTitle, context }[]` | Get unlinked title mentions |
@@ -262,18 +269,18 @@ Internal queries and mutations called by httpActions after API key validation. E
 | Function | Type | Parameters | Description |
 |----------|------|-----------|-------------|
 | `internalApi.getVault` | Internal Query | `{ vaultId }` | Get vault name and createdAt |
-| `internalApi.listFolders` | Internal Query | `{ vaultId }` | List all folders in vault |
+| `internalApi.listFolders` | Internal Query | `{ vaultId }` | List all active (non-deleted) folders in vault |
 | `internalApi.createFolder` | Internal Mutation | `{ name, vaultId, parentId? }` | Create folder |
 | `internalApi.renameFolder` | Internal Mutation | `{ id, vaultId, name }` | Rename folder (vault ownership check) |
 | `internalApi.moveFolder` | Internal Mutation | `{ id, vaultId, parentId? }` | Move folder |
-| `internalApi.removeFolder` | Internal Mutation | `{ id, vaultId }` | Delete folder (children promoted) |
-| `internalApi.listNotes` | Internal Query | `{ vaultId }` | List all notes in vault |
+| `internalApi.removeFolder` | Internal Mutation | `{ id, vaultId }` | Cascading soft-delete folder + descendants |
+| `internalApi.listNotes` | Internal Query | `{ vaultId }` | List all active (non-deleted) notes in vault |
 | `internalApi.getNote` | Internal Query | `{ id, vaultId }` | Get note (vault ownership check) |
 | `internalApi.createNote` | Internal Mutation | `{ title, vaultId, folderId? }` | Create note |
 | `internalApi.updateNote` | Internal Mutation | `{ id, vaultId, content }` | Update note content |
 | `internalApi.renameNote` | Internal Mutation | `{ id, vaultId, title }` | Rename note + wiki link propagation |
 | `internalApi.moveNote` | Internal Mutation | `{ id, vaultId, folderId? }` | Move note |
-| `internalApi.removeNote` | Internal Mutation | `{ id, vaultId }` | Delete note |
+| `internalApi.removeNote` | Internal Mutation | `{ id, vaultId }` | Soft-delete note |
 | `internalApi.searchNotes` | Internal Query | `{ vaultId, query }` | Full-text search (title + content) |
 | `internalApi.getBacklinks` | Internal Query | `{ noteId, vaultId }` | Get backlinks |
 | `internalApi.getUnlinkedMentions` | Internal Query | `{ noteId, vaultId }` | Get unlinked mentions |
@@ -488,18 +495,51 @@ No manual polling or refresh logic is needed.
 
 ### `notes.rename` — Wiki Link Propagation
 
-When a note is renamed, the mutation scans all notes in the vault and updates wiki link references:
+When a note is renamed, the mutation scans all **active** (non-deleted) notes in the vault and updates wiki link references:
 
 ```
-For each note in vault:
+For each non-deleted note in vault:
   Replace [[oldTitle]] → [[newTitle]]
   Replace [[oldTitle| → [[newTitle|
   Replace [[oldTitle# → [[newTitle#
 ```
 
+Soft-deleted notes are skipped during wiki link propagation.
+
+### `notes.update` — Audit Logging & Version Snapshots
+
+When a note is updated, the mutation:
+1. Sets `updatedBy` to the current user
+2. Calls `maybeCreateSnapshot` with trigger `auto` (throttled to 1 per 5 min)
+3. Logs an audit entry
+
+### `notes.remove` — Soft Delete
+
+```
+Create version snapshot (trigger: delete)
+Patch note: isDeleted = true, deletedAt = now, deletedBy = userId
+Log audit entry (action: delete)
+```
+
+### `folders.remove` — Cascading Soft Delete
+
+```
+Recursively collect all descendant folder IDs
+For each descendant folder:
+  Soft-delete all notes in the folder (same deletedAt timestamp)
+  Soft-delete the folder
+Soft-delete all notes in the root folder
+Soft-delete the root folder
+Log audit entry (action: delete)
+```
+
+All items in a cascade share the same `deletedAt` timestamp, enabling batch restore.
+
 ### `vaults.remove` — Cascade Deletion
 
 ```
+Delete all noteVersions where vaultId = vault._id
+Delete all auditLog entries where vaultId = vault._id
 Delete all notes where vaultId = vault._id
 Delete all folders where vaultId = vault._id
 Delete all vaultMembers where vaultId = vault._id
@@ -507,10 +547,35 @@ Delete all apiKeys where vaultId = vault._id
 Delete the vault document
 ```
 
-### `folders.remove` — Child Promotion
+### Audit Log API
 
-```
-Move child folders: set parentId = deletedFolder.parentId
-Move child notes: set folderId = deletedFolder.parentId (mapped to folderId)
-Delete the folder document
-```
+**File:** `convex/auditLog.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `auditLog.listByVault` | Query | `{ vaultId, limit? }` | `AuditEntry[]` | All entries for a vault, newest first |
+| `auditLog.listByTarget` | Query | `{ targetId }` | `AuditEntry[]` | All actions on a specific note/folder |
+
+### Version History API
+
+**File:** `convex/noteVersions.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `noteVersions.listByNote` | Query | `{ noteId }` | `Version[]` | All versions for a note, newest first |
+| `noteVersions.get` | Query | `{ id }` | `Version` | Get a specific version |
+| `noteVersions.restoreVersion` | Mutation | `{ noteId, versionId }` | — | Restore note from a version snapshot |
+
+### Trash API
+
+**File:** `convex/trash.ts`
+
+| Function | Type | Parameters | Returns | Description |
+|----------|------|-----------|---------|-------------|
+| `trash.listDeleted` | Query | `{ vaultId }` | `TrashItem[]` | All soft-deleted items, newest first |
+| `trash.getDeletedCount` | Query | `{ vaultId }` | `number` | Count of items in trash |
+| `trash.restoreNote` | Mutation | `{ id }` | — | Restore a soft-deleted note |
+| `trash.restoreFolder` | Mutation | `{ id }` | — | Restore folder + descendants |
+| `trash.permanentDeleteNote` | Mutation | `{ id }` | — | Hard-delete note + versions (owner only) |
+| `trash.permanentDeleteFolder` | Mutation | `{ id }` | — | Hard-delete folder (owner only) |
+| `trash.emptyTrash` | Mutation | `{ vaultId }` | — | Hard-delete all trash items (owner only) |

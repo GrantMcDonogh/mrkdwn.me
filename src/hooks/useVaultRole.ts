@@ -15,5 +15,6 @@ export function useVaultRole() {
     canDeleteVault: isOwner(state),
     canShareVault: isOwner(state),
     canRenameVault: isOwner(state),
+    canPermanentDelete: isOwner(state),
   };
 }

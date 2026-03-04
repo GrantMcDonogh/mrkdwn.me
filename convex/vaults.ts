@@ -98,6 +98,14 @@ export const remove = mutation({
     if (!identity) throw new Error("Not authenticated");
     await verifyVaultAccess(ctx.db, args.id, identity.tokenIdentifier, "owner");
 
+    // Cascade: delete all note versions
+    const noteVersions = await ctx.db
+      .query("noteVersions")
+      .withIndex("by_vault", (q) => q.eq("vaultId", args.id))
+      .collect();
+    for (const version of noteVersions) {
+      await ctx.db.delete(version._id);
+    }
     // Cascade: delete all notes
     const notes = await ctx.db
       .query("notes")
@@ -113,6 +121,14 @@ export const remove = mutation({
       .collect();
     for (const folder of folders) {
       await ctx.db.delete(folder._id);
+    }
+    // Cascade: delete all audit log entries
+    const auditEntries = await ctx.db
+      .query("auditLog")
+      .withIndex("by_vault", (q) => q.eq("vaultId", args.id))
+      .collect();
+    for (const entry of auditEntries) {
+      await ctx.db.delete(entry._id);
     }
     // Cascade: delete all vault memberships
     const members = await ctx.db

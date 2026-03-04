@@ -4,9 +4,10 @@ import { api } from "../../../convex/_generated/api";
 import { useWorkspace, type VaultRole } from "../../store/workspace";
 import { useVaultRole } from "../../hooks/useVaultRole";
 import FileExplorer from "../explorer/FileExplorer";
+import TrashPanel from "../trash/TrashPanel";
 import RoleBadge from "../vault/RoleBadge";
 import ShareVaultDialog from "../vault/ShareVaultDialog";
-import { Vault, ChevronDown, Check, Download, Users, LogOut } from "lucide-react";
+import { Vault, ChevronDown, Check, Download, Users, LogOut, Trash2 } from "lucide-react";
 import { useDownloadVault } from "../../hooks/useDownloadVault";
 
 function VaultSwitcher() {
@@ -141,13 +142,34 @@ function VaultSwitcher() {
 
 export default function Sidebar() {
   const [state] = useWorkspace();
+  const [showTrash, setShowTrash] = useState(false);
+  const trashCount = useQuery(
+    api.trash.getDeletedCount,
+    state.vaultId ? { vaultId: state.vaultId } : "skip"
+  );
 
   if (!state.sidebarOpen) return null;
 
   return (
     <div className="w-60 border-r border-obsidian-border bg-obsidian-bg-secondary flex flex-col overflow-hidden shrink-0">
       <VaultSwitcher />
-      <FileExplorer />
+      {showTrash ? <TrashPanel /> : <FileExplorer />}
+      <div className="border-t border-obsidian-border">
+        <button
+          onClick={() => setShowTrash(!showTrash)}
+          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-obsidian-bg-tertiary ${
+            showTrash ? "text-obsidian-accent" : "text-obsidian-text-muted hover:text-obsidian-text"
+          }`}
+        >
+          <Trash2 size={14} className="shrink-0" />
+          <span>Trash</span>
+          {trashCount != null && trashCount > 0 && (
+            <span className="ml-auto text-xs bg-obsidian-bg-tertiary rounded-full px-1.5 py-0.5 text-obsidian-text-muted">
+              {trashCount}
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

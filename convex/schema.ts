@@ -14,6 +14,9 @@ export default defineSchema({
     parentId: v.optional(v.id("folders")),
     vaultId: v.id("vaults"),
     order: v.number(),
+    isDeleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
+    deletedBy: v.optional(v.string()),
   })
     .index("by_vault", ["vaultId"])
     .index("by_parent", ["vaultId", "parentId"]),
@@ -26,6 +29,10 @@ export default defineSchema({
     order: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    isDeleted: v.optional(v.boolean()),
+    deletedAt: v.optional(v.number()),
+    deletedBy: v.optional(v.string()),
   })
     .index("by_vault", ["vaultId"])
     .index("by_folder", ["vaultId", "folderId"])
@@ -56,6 +63,38 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_vault_user", ["vaultId", "userId"])
     .index("by_email_status", ["email", "status"]),
+
+  auditLog: defineTable({
+    vaultId: v.id("vaults"),
+    userId: v.string(),
+    action: v.union(
+      v.literal("create"), v.literal("update"), v.literal("rename"),
+      v.literal("move"), v.literal("delete"), v.literal("restore"),
+      v.literal("permanent_delete")
+    ),
+    targetType: v.union(v.literal("note"), v.literal("folder")),
+    targetId: v.string(),
+    targetName: v.string(),
+    metadata: v.optional(v.any()),
+    timestamp: v.number(),
+  })
+    .index("by_vault", ["vaultId", "timestamp"])
+    .index("by_target", ["targetId", "timestamp"]),
+
+  noteVersions: defineTable({
+    noteId: v.id("notes"),
+    vaultId: v.id("vaults"),
+    title: v.string(),
+    content: v.string(),
+    savedBy: v.string(),
+    savedAt: v.number(),
+    trigger: v.union(
+      v.literal("auto"), v.literal("rename"),
+      v.literal("move"), v.literal("delete")
+    ),
+  })
+    .index("by_note", ["noteId", "savedAt"])
+    .index("by_vault", ["vaultId", "savedAt"]),
 
   apiKeys: defineTable({
     keyHash: v.string(),

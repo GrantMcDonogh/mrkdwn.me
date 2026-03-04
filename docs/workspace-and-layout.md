@@ -17,7 +17,7 @@ interface WorkspaceState {
   activePaneId: string;
   splitDirection: "horizontal" | "vertical" | null;
   sidebarOpen: boolean;
-  rightPanel: "backlinks" | "search" | "chat" | null;
+  rightPanel: "backlinks" | "search" | "chat" | "history" | null;
   searchQuery: string;
 }
 
@@ -49,7 +49,7 @@ interface Tab {
 | `SPLIT_PANE` | `direction` | Split the editor into two panes |
 | `CLOSE_PANE` | `paneId` | Close a pane (returns to single-pane) |
 | `TOGGLE_SIDEBAR` | — | Toggle left sidebar visibility |
-| `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/search/chat) or `null` to close |
+| `SET_RIGHT_PANEL` | `panel` | Set right panel (backlinks/search/chat/history) or `null` to close |
 | `SET_SEARCH_QUERY` | `query` | Update the search query string |
 | `TOGGLE_TAB_MODE` | `paneId, tabId` | Toggle a note tab between preview and edit mode (no-op for graph tabs) |
 
@@ -116,6 +116,8 @@ The toolbar spans the top of the layout and contains:
 | Graph button | Right | `OPEN_GRAPH` (opens graph as editor tab) |
 | Search button | Right | `SET_RIGHT_PANEL("search")` |
 | Chat button | Right | `SET_RIGHT_PANEL("chat")` |
+| History button | Right | `SET_RIGHT_PANEL("history")` |
+| Audit Log button | Right | Opens audit log modal dialog |
 
 Right-panel buttons toggle their respective panel. The graph button opens a graph tab in the active pane instead. The graph button is highlighted when the active tab is a graph tab; right-panel buttons are highlighted when their panel is open.
 
@@ -138,9 +140,10 @@ Registered in `AppLayout`:
 ### Behavior
 
 - Controlled by `sidebarOpen` in workspace state.
-- When open: renders the `VaultSwitcher` and `FileExplorer` components with a fixed width (`w-60` / 240px).
+- When open: renders the `VaultSwitcher` and either `FileExplorer` or `TrashPanel` with a fixed width (`w-60` / 240px).
 - When closed: returns `null` (component is not rendered at all, not hidden with width 0).
 - Toggled via the toolbar button or the command palette.
+- A **Trash toggle** button at the bottom of the sidebar switches between the file explorer and the trash panel. Shows a count badge when items are in the trash.
 
 ### Vault Switcher
 
@@ -160,7 +163,7 @@ At the top of the sidebar, the `VaultSwitcher` component displays the current va
 - Width: Fixed `w-60` (240px).
 - Background: `obsidian-bg-secondary`.
 - Border: Right border separating from editor area.
-- Content: `VaultSwitcher` (top, separated by border) + `FileExplorer` (see [file-explorer.md](./file-explorer.md)).
+- Content: `VaultSwitcher` (top, separated by border) + `FileExplorer` or `TrashPanel` (toggled by trash button at bottom). See [file-explorer.md](./file-explorer.md) and [audit-log-version-history-trash.md](./audit-log-version-history-trash.md).
 
 ---
 
@@ -258,6 +261,7 @@ The right panel is a collapsible area on the right side of the layout that displ
 | `"backlinks"` | `BacklinksPanel` | Backlinks and unlinked mentions for the active note |
 | `"search"` | `SearchPanel` | Full-text search and tag filtering |
 | `"chat"` | `ChatPanel` | RAG chat powered by Claude AI |
+| `"history"` | `VersionHistory` | Version history for the active note |
 | `null` | — | Panel hidden |
 
 Note: The graph view is not in the right panel — it opens as a tab in the editor area (see Tab Bar above).

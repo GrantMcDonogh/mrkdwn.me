@@ -78,12 +78,14 @@ Deletes a vault and all of its contents.
 - **Parameters**: `{ id: Id<"vaults"> }`
 - **Behavior**:
   1. Verifies owner access via `verifyVaultAccess`
-  2. Queries all notes in the vault → deletes each one
-  3. Queries all folders in the vault → deletes each one
-  4. Queries all vault members → deletes each one
-  5. Queries all API keys for the vault → deletes each one
-  6. Deletes the vault document itself
-- **Cascade**: Full cascade deletion — no orphaned folders, notes, memberships, or API keys remain
+  2. Queries all note versions in the vault → deletes each one
+  3. Queries all audit log entries in the vault → deletes each one
+  4. Queries all notes in the vault → deletes each one
+  5. Queries all folders in the vault → deletes each one
+  6. Queries all vault members → deletes each one
+  7. Queries all API keys for the vault → deletes each one
+  8. Deletes the vault document itself
+- **Cascade**: Full cascade deletion — no orphaned folders, notes, memberships, API keys, versions, or audit entries remain
 
 ### Internal Mutations
 
@@ -342,6 +344,7 @@ The `useVaultRole()` hook (`src/hooks/useVaultRole.ts`) derives boolean permissi
 | `canEditNotes` | yes | yes | no |
 | `canManageFolders` | yes | yes | no |
 | `canDragDrop` | yes | yes | no |
+| `canPermanentDelete` | yes | no | no |
 | `canDeleteVault` | yes | no | no |
 | `canShareVault` | yes | no | no |
 | `canRenameVault` | yes | no | no |
@@ -376,6 +379,10 @@ When a vault is deleted:
 
 ```
 Vault
+ ├── NoteVersion 1 → deleted
+ ├── NoteVersion 2 → deleted
+ ├── AuditLog 1    → deleted
+ ├── AuditLog 2    → deleted
  ├── Note 1        → deleted
  ├── Note 2        → deleted
  ├── Folder A      → deleted
@@ -387,4 +394,17 @@ Vault
  └── Note 4        → deleted
 ```
 
-All notes, folders, vault members, and API keys are queried by `vaultId` and deleted individually before the vault document itself is removed. This ensures no orphaned data remains.
+All note versions, audit log entries, notes, folders, vault members, and API keys are queried by `vaultId` and deleted individually before the vault document itself is removed. This ensures no orphaned data remains.
+
+When a **folder** is deleted (soft delete):
+
+```
+Folder A            → soft-deleted (isDeleted=true, deletedAt=T)
+ ├── Note 1         → soft-deleted (same deletedAt=T)
+ ├── Folder B       → soft-deleted (same deletedAt=T)
+ │   ├── Note 2     → soft-deleted (same deletedAt=T)
+ │   └── Folder C   → soft-deleted (same deletedAt=T)
+ └── Note 3         → soft-deleted (same deletedAt=T)
+```
+
+All items in a cascade share the same `deletedAt` timestamp, enabling batch restore from the Trash panel. See [Audit Log, Version History & Trash](./audit-log-version-history-trash.md) for details.

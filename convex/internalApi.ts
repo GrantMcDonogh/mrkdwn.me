@@ -21,10 +21,11 @@ export const getVault = internalQuery({
 export const listFolders = internalQuery({
   args: { vaultId: v.id("vaults") },
   handler: async (ctx, args) => {
-    return ctx.db
+    const all = await ctx.db
       .query("folders")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
       .collect();
+    return all.filter((f) => f.isDeleted !== true);
   },
 });
 
@@ -45,7 +46,7 @@ export const createFolder = internalMutation({
       name: args.name,
       vaultId: args.vaultId,
       parentId: args.parentId,
-      order: siblings.length,
+      order: siblings.filter((f) => f.isDeleted !== true).length,
     });
   },
 });
@@ -74,29 +75,55 @@ export const removeFolder = internalMutation({
     const folder = await ctx.db.get(args.id);
     if (!folder || folder.vaultId !== args.vaultId) throw new Error("Folder not found");
 
-    // Promote child folders to deleted folder's parent
-    const childFolders = await ctx.db
-      .query("folders")
-      .withIndex("by_parent", (q) =>
-        q.eq("vaultId", folder.vaultId).eq("parentId", args.id)
-      )
-      .collect();
-    for (const child of childFolders) {
-      await ctx.db.patch(child._id, { parentId: folder.parentId });
+    const now = Date.now();
+
+    // Collect all descendant folder IDs recursively
+    async function getDescendantFolderIds(parentId: Id<"folders">): Promise<Id<"folders">[]> {
+      const children = await ctx.db
+        .query("folders")
+        .withIndex("by_parent", (q) =>
+          q.eq("vaultId", args.vaultId).eq("parentId", parentId)
+        )
+        .collect();
+      const activeChildren = children.filter((f) => f.isDeleted !== true);
+      const ids: Id<"folders">[] = [];
+      for (const child of activeChildren) {
+        ids.push(child._id);
+        const grandChildren = await getDescendantFolderIds(child._id);
+        ids.push(...grandChildren);
+      }
+      return ids;
     }
 
-    // Promote child notes to deleted folder's parent
-    const childNotes = await ctx.db
-      .query("notes")
-      .withIndex("by_folder", (q) =>
-        q.eq("vaultId", folder.vaultId).eq("folderId", args.id)
-      )
-      .collect();
-    for (const note of childNotes) {
-      await ctx.db.patch(note._id, { folderId: folder.parentId });
+    const descendantIds = await getDescendantFolderIds(args.id);
+    const allFolderIds = [args.id, ...descendantIds];
+
+    // Soft delete all folders
+    for (const folderId of allFolderIds) {
+      await ctx.db.patch(folderId, {
+        isDeleted: true,
+        deletedAt: now,
+        deletedBy: "api",
+      });
     }
 
-    await ctx.db.delete(args.id);
+    // Soft delete all notes in these folders
+    for (const folderId of allFolderIds) {
+      const notes = await ctx.db
+        .query("notes")
+        .withIndex("by_folder", (q) =>
+          q.eq("vaultId", args.vaultId).eq("folderId", folderId)
+        )
+        .collect();
+      for (const note of notes) {
+        if (note.isDeleted === true) continue;
+        await ctx.db.patch(note._id, {
+          isDeleted: true,
+          deletedAt: now,
+          deletedBy: "api",
+        });
+      }
+    }
   },
 });
 
@@ -105,10 +132,11 @@ export const removeFolder = internalMutation({
 export const listNotes = internalQuery({
   args: { vaultId: v.id("vaults") },
   handler: async (ctx, args) => {
-    return ctx.db
+    const all = await ctx.db
       .query("notes")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
       .collect();
+    return all.filter((n) => n.isDeleted !== true);
   },
 });
 
@@ -140,7 +168,7 @@ export const createNote = internalMutation({
       content: "",
       vaultId: args.vaultId,
       folderId: args.folderId,
-      order: siblings.length,
+      order: siblings.filter((n) => n.isDeleted !== true).length,
       createdAt: now,
       updatedAt: now,
     });
@@ -175,6 +203,7 @@ export const renameNote = internalMutation({
         .collect();
       for (const other of allNotes) {
         if (other._id === args.id) continue;
+        if (other.isDeleted === true) continue;
         let content = other.content;
         let changed = false;
         const patterns = [
@@ -210,7 +239,12 @@ export const removeNote = internalMutation({
   handler: async (ctx, args) => {
     const note = await ctx.db.get(args.id);
     if (!note || note.vaultId !== args.vaultId) throw new Error("Note not found");
-    await ctx.db.delete(args.id);
+    // Soft delete
+    await ctx.db.patch(args.id, {
+      isDeleted: true,
+      deletedAt: Date.now(),
+      deletedBy: "api",
+    });
   },
 });
 
@@ -236,7 +270,7 @@ export const searchNotes = internalQuery({
     const seen = new Set<string>();
     const results = [];
     for (const note of [...titleResults, ...contentResults]) {
-      if (!seen.has(note._id)) {
+      if (!seen.has(note._id) && note.isDeleted !== true) {
         seen.add(note._id);
         results.push(note);
       }
@@ -259,6 +293,7 @@ export const getBacklinks = internalQuery({
     const backlinks: { noteId: Id<"notes">; noteTitle: string; context: string }[] = [];
     for (const other of allNotes) {
       if (other._id === args.noteId) continue;
+      if (other.isDeleted === true) continue;
       if (
         other.content.includes(`[[${note.title}]]`) ||
         other.content.includes(`[[${note.title}|`) ||
@@ -300,6 +335,7 @@ export const getUnlinkedMentions = internalQuery({
 
     for (const other of allNotes) {
       if (other._id === args.noteId) continue;
+      if (other.isDeleted === true) continue;
       const contentLower = other.content.toLowerCase();
       if (!contentLower.includes(titleLower)) continue;
 

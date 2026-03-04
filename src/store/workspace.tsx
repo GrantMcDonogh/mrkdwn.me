@@ -31,7 +31,7 @@ export interface WorkspaceState {
   activePaneId: string;
   splitDirection: "horizontal" | "vertical" | null;
   sidebarOpen: boolean;
-  rightPanel: "backlinks" | "search" | "chat" | null;
+  rightPanel: "backlinks" | "search" | "chat" | "history" | null;
   searchQuery: string;
 }
 

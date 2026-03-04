@@ -1,6 +1,8 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { verifyVaultAccess } from "./auth";
+import { logAudit } from "./auditLog";
+import { maybeCreateSnapshot } from "./noteVersions";
 
 export const importBatch = mutation({
   args: {
@@ -17,17 +19,18 @@ export const importBatch = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+    const userId = identity.tokenIdentifier;
     if (args.notes.length > 0) {
       await verifyVaultAccess(
         ctx.db,
         args.notes[0]!.vaultId,
-        identity.tokenIdentifier,
+        userId,
         "editor"
       );
     }
     const now = Date.now();
     for (const note of args.notes) {
-      await ctx.db.insert("notes", {
+      const noteId = await ctx.db.insert("notes", {
         title: note.title,
         content: note.content,
         vaultId: note.vaultId,
@@ -35,6 +38,14 @@ export const importBatch = mutation({
         order: note.order,
         createdAt: now,
         updatedAt: now,
+      });
+      await logAudit(ctx.db, {
+        vaultId: note.vaultId,
+        userId,
+        action: "create",
+        targetType: "note",
+        targetId: noteId,
+        targetName: note.title,
       });
     }
   },
@@ -47,10 +58,11 @@ export const list = query({
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
     await verifyVaultAccess(ctx.db, args.vaultId, userId, "viewer");
-    return ctx.db
+    const all = await ctx.db
       .query("notes")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
       .collect();
+    return all.filter((n) => n.isDeleted !== true);
   },
 });
 
@@ -85,15 +97,24 @@ export const create = mutation({
       )
       .collect();
     const now = Date.now();
-    return ctx.db.insert("notes", {
+    const noteId = await ctx.db.insert("notes", {
       title: args.title,
       content: "",
       vaultId: args.vaultId,
       folderId: args.folderId,
-      order: siblings.length,
+      order: siblings.filter((n) => n.isDeleted !== true).length,
       createdAt: now,
       updatedAt: now,
     });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId,
+      action: "create",
+      targetType: "note",
+      targetId: noteId,
+      targetName: args.title,
+    });
+    return noteId;
   },
 });
 
@@ -106,7 +127,28 @@ export const update = mutation({
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
     await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
-    await ctx.db.patch(args.id, { content: args.content, updatedAt: Date.now() });
+
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: note.vaultId,
+      userId,
+      trigger: "auto",
+    });
+
+    await ctx.db.patch(args.id, {
+      content: args.content,
+      updatedAt: Date.now(),
+      updatedBy: userId,
+    });
+
+    await logAudit(ctx.db, {
+      vaultId: note.vaultId,
+      userId,
+      action: "update",
+      targetType: "note",
+      targetId: args.id,
+      targetName: note.title,
+    });
   },
 });
 
@@ -123,8 +165,16 @@ export const rename = mutation({
     const oldTitle = note.title;
     const newTitle = args.title;
 
+    // Snapshot before rename
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: note.vaultId,
+      userId,
+      trigger: "rename",
+    });
+
     // Update the note title
-    await ctx.db.patch(args.id, { title: newTitle, updatedAt: Date.now() });
+    await ctx.db.patch(args.id, { title: newTitle, updatedAt: Date.now(), updatedBy: userId });
 
     // Propagate wiki link renames across all notes in the vault
     if (oldTitle !== newTitle) {
@@ -134,9 +184,9 @@ export const rename = mutation({
         .collect();
       for (const other of allNotes) {
         if (other._id === args.id) continue;
+        if (other.isDeleted === true) continue;
         let content = other.content;
         let changed = false;
-        // Replace [[OldTitle]] → [[NewTitle]]
         const patterns = [
           { find: `[[${oldTitle}]]`, replace: `[[${newTitle}]]` },
           { find: `[[${oldTitle}|`, replace: `[[${newTitle}|` },
@@ -153,6 +203,16 @@ export const rename = mutation({
         }
       }
     }
+
+    await logAudit(ctx.db, {
+      vaultId: note.vaultId,
+      userId,
+      action: "rename",
+      targetType: "note",
+      targetId: args.id,
+      targetName: newTitle,
+      metadata: { oldTitle, newTitle },
+    });
   },
 });
 
@@ -165,7 +225,27 @@ export const move = mutation({
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
     await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
+
+    const fromFolder = note.folderId ?? null;
+
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: note.vaultId,
+      userId,
+      trigger: "move",
+    });
+
     await ctx.db.patch(args.id, { folderId: args.folderId });
+
+    await logAudit(ctx.db, {
+      vaultId: note.vaultId,
+      userId,
+      action: "move",
+      targetType: "note",
+      targetId: args.id,
+      targetName: note.title,
+      metadata: { fromFolder, toFolder: args.folderId ?? null },
+    });
   },
 });
 
@@ -178,7 +258,30 @@ export const remove = mutation({
     const note = await ctx.db.get(args.id);
     if (!note) throw new Error("Note not found");
     await verifyVaultAccess(ctx.db, note.vaultId, userId, "editor");
-    await ctx.db.delete(args.id);
+
+    // Snapshot before soft delete
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: note.vaultId,
+      userId,
+      trigger: "delete",
+    });
+
+    // Soft delete instead of hard delete
+    await ctx.db.patch(args.id, {
+      isDeleted: true,
+      deletedAt: Date.now(),
+      deletedBy: userId,
+    });
+
+    await logAudit(ctx.db, {
+      vaultId: note.vaultId,
+      userId,
+      action: "delete",
+      targetType: "note",
+      targetId: args.id,
+      targetName: note.title,
+    });
   },
 });
 
@@ -206,11 +309,11 @@ export const search = query({
       )
       .take(20);
 
-    // Merge and deduplicate
+    // Merge, deduplicate, and filter out deleted
     const seen = new Set<string>();
     const results = [];
     for (const note of [...titleResults, ...contentResults]) {
-      if (!seen.has(note._id)) {
+      if (!seen.has(note._id) && note.isDeleted !== true) {
         seen.add(note._id);
         results.push(note);
       }
@@ -237,12 +340,12 @@ export const getBacklinks = query({
     const backlinks: { noteId: typeof note._id; noteTitle: string; context: string }[] = [];
     for (const other of allNotes) {
       if (other._id === args.noteId) continue;
+      if (other.isDeleted === true) continue;
       if (
         other.content.includes(`[[${note.title}]]`) ||
         other.content.includes(`[[${note.title}|`) ||
         other.content.includes(`[[${note.title}#`)
       ) {
-        // Extract context line
         const lines = other.content.split("\n");
         const contextLine = lines.find(
           (l) =>
@@ -283,15 +386,14 @@ export const getUnlinkedMentions = query({
 
     for (const other of allNotes) {
       if (other._id === args.noteId) continue;
+      if (other.isDeleted === true) continue;
       const contentLower = other.content.toLowerCase();
       if (!contentLower.includes(titleLower)) continue;
 
-      // Check it's not already inside [[ ]]
       const lines = other.content.split("\n");
       for (const line of lines) {
         const lineLower = line.toLowerCase();
         if (!lineLower.includes(titleLower)) continue;
-        // Simple check: if the title appears outside of [[ ]]
         const idx = lineLower.indexOf(titleLower);
         const before = line.substring(0, idx);
         if (before.lastIndexOf("[[") > before.lastIndexOf("]]")) continue;

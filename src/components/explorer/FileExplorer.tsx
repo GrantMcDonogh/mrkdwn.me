@@ -328,7 +328,6 @@ export default function FileExplorer() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (!confirm("Are you sure you want to delete this folder and all its contents?")) return;
                     removeFolder({ id: folder._id });
                   }}
                   className="p-0.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-red-400"
@@ -415,7 +414,6 @@ export default function FileExplorer() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!confirm("Are you sure you want to permanently delete this note?")) return;
                   for (const pane of state.panes) {
                     for (const tab of pane.tabs) {
                       if (tab.noteId === note._id) {

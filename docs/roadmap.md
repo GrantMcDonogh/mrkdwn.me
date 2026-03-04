@@ -151,3 +151,19 @@ Multi-user vault sharing with three roles: Owner, Editor, and Viewer. Owners inv
 
 ### Chat Endpoint Security Fix — Mar 3, 2026
 The `/api/chat` and `/api/chat-edit` httpAction endpoints now verify the authenticated user has access to the requested vault before building context. Previously, any authenticated user who knew a vault ID could query its notes. Q&A mode requires viewer access; edit mode requires editor access.
+
+---
+
+## Mar 4, 2026
+
+### Audit Log — Mar 4, 2026
+Every mutation that modifies notes or folders records an audit entry with user attribution, action type, target info, and metadata.
+Queryable by vault (newest first) or by specific target. Viewable from a toolbar button in a filterable modal dialog.
+
+### Note Version History — Mar 4, 2026
+Automatic point-in-time snapshots of note content, throttled to max 1 per 5 minutes on content edits.
+Rename, move, and delete always create a snapshot. Versions are viewable and restorable from a right-panel History view.
+
+### Soft Delete & Trash — Mar 4, 2026
+Notes and folders are soft-deleted instead of permanently removed. Deleted items are retained for up to 5 years and appear in a Trash panel in the sidebar.
+Folder deletion cascades to all descendants. Items can be restored (editor+) or permanently deleted (owner only). A daily cron purges items older than 5 years.

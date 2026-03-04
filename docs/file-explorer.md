@@ -14,6 +14,9 @@ folders: defineTable({
   parentId: v.optional(v.id("folders")),
   vaultId: v.id("vaults"),
   order: v.number(),
+  isDeleted: v.optional(v.boolean()),
+  deletedAt: v.optional(v.number()),
+  deletedBy: v.optional(v.string()),
 })
   .index("by_vault", ["vaultId"])
   .index("by_parent", ["vaultId", "parentId"]),
@@ -26,6 +29,9 @@ folders: defineTable({
 | `parentId` | `Id<"folders">` or `undefined` | Parent folder (`undefined` = root level) |
 | `vaultId` | `Id<"vaults">` | Owning vault |
 | `order` | `number` | Sort position among siblings |
+| `isDeleted` | `boolean` or `undefined` | Soft-delete flag (`true` = in trash) |
+| `deletedAt` | `number` or `undefined` | Deletion timestamp |
+| `deletedBy` | `string` or `undefined` | Who deleted it |
 
 ### Notes (`convex/schema.ts`)
 
@@ -39,6 +45,10 @@ folders: defineTable({
 | `order` | `number` | Sort position among sibling notes (computed independently from folder order) |
 | `createdAt` | `number` | Creation timestamp |
 | `updatedAt` | `number` | Last modification timestamp |
+| `updatedBy` | `string` or `undefined` | Who last edited |
+| `isDeleted` | `boolean` or `undefined` | Soft-delete flag (`true` = in trash) |
+| `deletedAt` | `number` or `undefined` | Deletion timestamp |
+| `deletedBy` | `string` or `undefined` | Who deleted it |
 
 **Indexes:** `by_vault` (`["vaultId"]`), `by_folder` (`["vaultId", "folderId"]`), plus `search_content` and `search_title` search indexes.
 
@@ -50,7 +60,7 @@ folders: defineTable({
 
 #### `folders.list(vaultId)`
 
-Returns all folders in a vault. The frontend builds the tree structure client-side using `parentId` relationships.
+Returns all **active** (non-deleted) folders in a vault. Soft-deleted folders are filtered out. The frontend builds the tree structure client-side using `parentId` relationships.
 
 ### Mutations
 
@@ -68,7 +78,7 @@ Moves a folder to a new parent. Setting `parentId` to `undefined` moves the fold
 
 #### `folders.remove({ id })`
 
-Deletes a folder. Child notes and folders within the deleted folder are **promoted** to the deleted folder's parent (i.e., they are moved up one level, not deleted). Note: the `order` field is **not** recomputed for promoted children.
+Soft-deletes a folder and all of its contents via **cascading soft delete**. All descendant folders and contained notes are marked as `isDeleted: true` with the same `deletedAt` timestamp. Items can be restored from the Trash panel. See [Audit Log, Version History & Trash](./audit-log-version-history-trash.md).
 
 ## Notes API
 
@@ -76,7 +86,7 @@ Deletes a folder. Child notes and folders within the deleted folder are **promot
 
 #### `notes.list({ vaultId })`
 
-Returns all notes in a vault.
+Returns all **active** (non-deleted) notes in a vault. Soft-deleted notes are filtered out.
 
 ### Mutations
 
@@ -94,7 +104,7 @@ Moves a note to a folder. Note: the `order` field is **not** recomputed after mo
 
 #### `notes.remove({ id })`
 
-Deletes a note.
+Soft-deletes a note by setting `isDeleted: true`, `deletedAt`, and `deletedBy`. Creates a version snapshot before deletion. The note can be restored from the Trash panel. See [Audit Log, Version History & Trash](./audit-log-version-history-trash.md).
 
 ## Frontend Component
 
@@ -138,8 +148,8 @@ File Explorer Panel
 | **Create Folder** | Click `FolderPlus` button on header or folder hover | Opens inline creation form with default name "New Folder". On Enter or blur, calls `folders.create`. If inside a folder, auto-expands it. |
 | **Upload .md Files** | Click `Upload` button on header or folder hover | Opens native file picker (`.md` only, multi-select). Filters to `.md` files, reads content, batches via `batchNotes()`, and calls `notes.importBatch` for each batch. Header shows "Uploading…" spinner during upload. When triggered from a folder's hover button, notes are created inside that folder; from the header, notes go to the vault root. |
 | **Rename** | Double-click item name | Switches to inline edit mode; save on Enter or blur. Escape cancels. |
-| **Delete Note** | Click `Trash2` icon (visible on hover) | Shows confirmation dialog; calls `notes.remove` mutation |
-| **Delete Folder** | Click `Trash2` icon (visible on hover) | Shows confirmation dialog; calls `folders.remove` mutation; children promoted |
+| **Delete Note** | Click `Trash2` icon (visible on hover) | Calls `notes.remove` mutation (soft delete — moves to trash) |
+| **Delete Folder** | Click `Trash2` icon (visible on hover) | Calls `folders.remove` mutation (cascading soft delete — folder + descendants moved to trash) |
 | **Move (Drag & Drop)** | Drag item onto a folder or root area | Calls `notes.move({ id, folderId })` or `folders.move({ id, parentId })`. Dropping on empty space moves to root. Folders cannot be dropped into themselves or their own descendants — such drops are redirected to root. No-op moves (already at target) are skipped. |
 | **Upload via Drag & Drop** | Drag `.md` files from OS file manager onto the explorer | Detects external file drops (checks `e.dataTransfer.files`), filters to `.md` files, and uploads them via `prepareUploadNotes()` + `batchNotes()` + `notes.importBatch`. Dropping onto a folder uploads into that folder; dropping on the root area uploads to the vault root. Non-`.md` files are silently ignored. |
 

@@ -10,11 +10,13 @@ import BacklinksPanel from "../backlinks/BacklinksPanel";
 import SearchPanel from "../search/SearchPanel";
 import GraphView from "../graph/GraphView";
 import ChatPanel from "../chat/ChatPanel";
+import VersionHistory from "../editor/VersionHistory";
 import SplitPane from "./SplitPane";
 import CommandPalette from "../command-palette/CommandPalette";
 import QuickSwitcher from "../command-palette/QuickSwitcher";
 import SettingsDialog from "../settings/SettingsDialog";
 import ShareVaultDialog from "../vault/ShareVaultDialog";
+import AuditLog from "../vault/AuditLog";
 import RoleBadge from "../vault/RoleBadge";
 import {
   PanelLeft,
@@ -23,6 +25,8 @@ import {
   Search,
   FileText,
   MessageSquare,
+  History,
+  ClipboardList,
   Settings,
   Users,
 } from "lucide-react";
@@ -38,6 +42,7 @@ export default function AppLayout() {
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showAuditLog, setShowAuditLog] = useState(false);
 
   // Detect access revocation — vault query returns error/null for revoked users
   useEffect(() => {
@@ -95,6 +100,8 @@ export default function AppLayout() {
         return <SearchPanel />;
       case "chat":
         return <ChatPanel />;
+      case "history":
+        return <VersionHistory />;
       default:
         return null;
     }
@@ -217,6 +224,26 @@ export default function AppLayout() {
           <MessageSquare size={18} />
         </button>
         <button
+          onClick={() =>
+            dispatch({ type: "SET_RIGHT_PANEL", panel: "history" })
+          }
+          className={`p-1.5 rounded hover:bg-obsidian-bg-tertiary ${
+            state.rightPanel === "history"
+              ? "text-obsidian-accent"
+              : "text-obsidian-text-muted hover:text-obsidian-text"
+          }`}
+          title="Version History"
+        >
+          <History size={18} />
+        </button>
+        <button
+          onClick={() => setShowAuditLog(true)}
+          className="p-1.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
+          title="Audit Log"
+        >
+          <ClipboardList size={18} />
+        </button>
+        <button
           onClick={() => setShowSettings(true)}
           className="p-1.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-obsidian-text"
           title="Settings"
@@ -272,6 +299,12 @@ export default function AppLayout() {
         <ShareVaultDialog
           vaultId={state.vaultId}
           onClose={() => setShowShare(false)}
+        />
+      )}
+      {showAuditLog && state.vaultId && (
+        <AuditLog
+          vaultId={state.vaultId}
+          onClose={() => setShowAuditLog(false)}
         />
       )}
     </div>

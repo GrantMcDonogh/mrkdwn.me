@@ -78,13 +78,14 @@ mrkdwn-me/
 │   │   ├── chat/                 # AI chat panel (RAG Q&A + edit mode)
 │   │   ├── command-palette/      # Command palette & quick switcher
 │   │   ├── docs/                 # Public API documentation page
-│   │   ├── editor/               # Markdown editor, preview, wiki links, live preview
+│   │   ├── editor/               # Markdown editor, preview, wiki links, live preview, version history
 │   │   ├── explorer/             # File tree explorer
+│   │   ├── trash/                # Trash panel (soft-deleted items)
 │   │   ├── graph/                # D3.js graph visualization
 │   │   ├── layout/               # App layout, sidebar, split panes, tabs
 │   │   ├── search/               # Search panel
 │   │   ├── settings/             # Settings dialog (OpenRouter key, vault API keys)
-│   │   └── vault/                # Vault selection, management, sharing & onboarding
+│   │   └── vault/                # Vault selection, management, sharing, onboarding & audit log
 │   ├── hooks/
 │   │   ├── useDownloadVault.ts   # Vault download hook
 │   │   ├── useExportNotePDF.ts   # Single-note PDF export hook
@@ -106,6 +107,10 @@ mrkdwn-me/
 │   ├── vaults.ts                 # Vault CRUD operations
 │   ├── folders.ts                # Folder management
 │   ├── notes.ts                  # Note CRUD, search, backlinks
+│   ├── auditLog.ts               # Audit log helper + queries
+│   ├── noteVersions.ts           # Version snapshot helper + queries + restore
+│   ├── trash.ts                  # Trash queries, restore, permanent delete, purge
+│   ├── crons.ts                  # Daily cron for 5-year trash purge
 │   ├── sharing.ts                # Vault sharing (invite, accept, list, remove)
 │   ├── apiKeys.ts                # Vault API key CRUD + internal validation
 │   ├── internalApi.ts            # Auth-free internal queries/mutations for REST API
@@ -144,20 +149,23 @@ mrkdwn-me/
 
 ## Data Model Overview
 
-The application has six database tables (users are managed by Clerk):
+The application has eight database tables (users are managed by Clerk):
 
 - **Vaults** - Top-level containers owned by a user (identified by Clerk `tokenIdentifier`). All notes and folders belong to a vault.
-- **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`. Have an `order` field for sorting.
-- **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content. Have `order`, `createdAt`, and `updatedAt` fields.
+- **Folders** - Hierarchical containers within a vault. Support unlimited nesting via self-referencing `parentId`. Have an `order` field for sorting. Support soft deletion with `isDeleted`, `deletedAt`, `deletedBy` fields.
+- **Notes** - Markdown documents within a vault, optionally inside a folder. Support full-text search on title and content. Have `order`, `createdAt`, `updatedAt`, and `updatedBy` fields. Support soft deletion with `isDeleted`, `deletedAt`, `deletedBy` fields.
 - **Vault Members** - Sharing memberships linking users to vaults with a role (editor or viewer). Owner role is implicit from `vaults.userId`. Supports email-based invitations with pending/accepted status.
 - **User Settings** - Per-user configuration (OpenRouter API key for chat edit mode). Keyed by Clerk `tokenIdentifier`.
 - **API Keys** - Vault-scoped API keys for the REST API and MCP server. Only the SHA-256 hash is stored; the raw key is shown once at creation.
+- **Audit Log** - Records every action (create, update, rename, move, delete, restore, permanent delete) with user attribution. Indexed by vault and target.
+- **Note Versions** - Point-in-time content snapshots of notes. Throttled to max 1 per 5 min on content edits; always created on rename, move, and delete.
 
 ```
 User (Clerk) 1──* Vault 1──* Folder (self-referencing parentId)
-                       | 1──* Note
+                       | 1──* Note 1──* NoteVersion
                        | 1──* VaultMember (sharing)
                        | 1──* ApiKey
+                       | 1──* AuditLog
              1──1 UserSettings
 ```
 
@@ -221,3 +229,4 @@ npm run lint
 | Download, Export & PDF | [download-vault.md](./download-vault.md) |
 | Design & Styling | [design-and-styling.md](./design-and-styling.md) |
 | MCP Server | [mcp-server.md](./mcp-server.md) |
+| Audit Log, Version History & Trash | [audit-log-version-history-trash.md](./audit-log-version-history-trash.md) |

@@ -2,6 +2,7 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { verifyVaultAccess } from "./auth";
+import { logAudit } from "./auditLog";
 
 export const importBatch = internalMutation({
   args: {
@@ -42,10 +43,11 @@ export const list = query({
     if (!identity) throw new Error("Not authenticated");
     const userId = identity.tokenIdentifier;
     await verifyVaultAccess(ctx.db, args.vaultId, userId, "viewer");
-    return ctx.db
+    const all = await ctx.db
       .query("folders")
       .withIndex("by_vault", (q) => q.eq("vaultId", args.vaultId))
       .collect();
+    return all.filter((f) => f.isDeleted !== true);
   },
 });
 
@@ -66,12 +68,21 @@ export const create = mutation({
         q.eq("vaultId", args.vaultId).eq("parentId", args.parentId)
       )
       .collect();
-    return ctx.db.insert("folders", {
+    const folderId = await ctx.db.insert("folders", {
       name: args.name,
       vaultId: args.vaultId,
       parentId: args.parentId,
-      order: siblings.length,
+      order: siblings.filter((f) => f.isDeleted !== true).length,
     });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId,
+      action: "create",
+      targetType: "folder",
+      targetId: folderId,
+      targetName: args.name,
+    });
+    return folderId;
   },
 });
 
@@ -84,7 +95,19 @@ export const rename = mutation({
     const folder = await ctx.db.get(args.id);
     if (!folder) throw new Error("Folder not found");
     await verifyVaultAccess(ctx.db, folder.vaultId, userId, "editor");
+
+    const oldName = folder.name;
     await ctx.db.patch(args.id, { name: args.name });
+
+    await logAudit(ctx.db, {
+      vaultId: folder.vaultId,
+      userId,
+      action: "rename",
+      targetType: "folder",
+      targetId: args.id,
+      targetName: args.name,
+      metadata: { oldName, newName: args.name },
+    });
   },
 });
 
@@ -97,7 +120,19 @@ export const move = mutation({
     const folder = await ctx.db.get(args.id);
     if (!folder) throw new Error("Folder not found");
     await verifyVaultAccess(ctx.db, folder.vaultId, userId, "editor");
+
+    const fromParent = folder.parentId ?? null;
     await ctx.db.patch(args.id, { parentId: args.parentId });
+
+    await logAudit(ctx.db, {
+      vaultId: folder.vaultId,
+      userId,
+      action: "move",
+      targetType: "folder",
+      targetId: args.id,
+      targetName: folder.name,
+      metadata: { fromParent, toParent: args.parentId ?? null },
+    });
   },
 });
 
@@ -111,28 +146,63 @@ export const remove = mutation({
     if (!folder) throw new Error("Folder not found");
     await verifyVaultAccess(ctx.db, folder.vaultId, userId, "editor");
 
-    // Promote child folders to deleted folder's parent
-    const childFolders = await ctx.db
-      .query("folders")
-      .withIndex("by_parent", (q) =>
-        q.eq("vaultId", folder.vaultId).eq("parentId", args.id)
-      )
-      .collect();
-    for (const child of childFolders) {
-      await ctx.db.patch(child._id, { parentId: folder.parentId });
+    const now = Date.now();
+
+    // Collect all descendant folder IDs recursively
+    async function getDescendantFolderIds(parentId: Id<"folders">): Promise<Id<"folders">[]> {
+      const children = await ctx.db
+        .query("folders")
+        .withIndex("by_parent", (q) =>
+          q.eq("vaultId", folder!.vaultId).eq("parentId", parentId)
+        )
+        .collect();
+      const activeChildren = children.filter((f) => f.isDeleted !== true);
+      const ids: Id<"folders">[] = [];
+      for (const child of activeChildren) {
+        ids.push(child._id);
+        const grandChildren = await getDescendantFolderIds(child._id);
+        ids.push(...grandChildren);
+      }
+      return ids;
     }
 
-    // Promote child notes to deleted folder's parent
-    const childNotes = await ctx.db
-      .query("notes")
-      .withIndex("by_folder", (q) =>
-        q.eq("vaultId", folder.vaultId).eq("folderId", args.id)
-      )
-      .collect();
-    for (const note of childNotes) {
-      await ctx.db.patch(note._id, { folderId: folder.parentId });
+    const descendantIds = await getDescendantFolderIds(args.id);
+    const allFolderIds = [args.id, ...descendantIds];
+
+    // Soft delete all folders
+    for (const folderId of allFolderIds) {
+      await ctx.db.patch(folderId, {
+        isDeleted: true,
+        deletedAt: now,
+        deletedBy: userId,
+      });
     }
 
-    await ctx.db.delete(args.id);
+    // Soft delete all notes in these folders
+    for (const folderId of allFolderIds) {
+      const notes = await ctx.db
+        .query("notes")
+        .withIndex("by_folder", (q) =>
+          q.eq("vaultId", folder.vaultId).eq("folderId", folderId)
+        )
+        .collect();
+      for (const note of notes) {
+        if (note.isDeleted === true) continue;
+        await ctx.db.patch(note._id, {
+          isDeleted: true,
+          deletedAt: now,
+          deletedBy: userId,
+        });
+      }
+    }
+
+    await logAudit(ctx.db, {
+      vaultId: folder.vaultId,
+      userId,
+      action: "delete",
+      targetType: "folder",
+      targetId: args.id,
+      targetName: folder.name,
+    });
   },
 });

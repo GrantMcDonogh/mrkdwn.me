@@ -235,6 +235,30 @@ describe("SET_RIGHT_PANEL", () => {
     ]);
     expect(s.rightPanel).toBeNull();
   });
+
+  it("supports history panel", () => {
+    const s = reducer(initialState, {
+      type: "SET_RIGHT_PANEL",
+      panel: "history",
+    });
+    expect(s.rightPanel).toBe("history");
+  });
+
+  it("switches from one panel to another", () => {
+    const s = apply([
+      { type: "SET_RIGHT_PANEL", panel: "backlinks" },
+      { type: "SET_RIGHT_PANEL", panel: "history" },
+    ]);
+    expect(s.rightPanel).toBe("history");
+  });
+
+  it("toggles off history panel", () => {
+    const s = apply([
+      { type: "SET_RIGHT_PANEL", panel: "history" },
+      { type: "SET_RIGHT_PANEL", panel: "history" },
+    ]);
+    expect(s.rightPanel).toBeNull();
+  });
 });
 
 // ---------- OPEN_GRAPH ----------
