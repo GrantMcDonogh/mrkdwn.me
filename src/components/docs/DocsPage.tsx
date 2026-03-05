@@ -137,7 +137,7 @@ export const sections: Section[] = [
         id: "delete-folder",
         method: "DELETE",
         path: "/api/v1/folders",
-        summary: "Delete a folder. Child folders and notes are promoted to the deleted folder's parent.",
+        summary: "Delete a folder and all its descendants (cascading soft-delete). Contained notes and subfolders are also moved to trash.",
         params: [
           { name: "id", type: "string", required: true, description: "Folder ID" },
         ],
@@ -349,7 +349,7 @@ export const sections: Section[] = [
         id: "delete-note",
         method: "DELETE",
         path: "/api/v1/notes",
-        summary: "Permanently delete a note.",
+        summary: "Soft-delete a note (moves to trash). Can be restored from the Trash panel.",
         params: [
           { name: "id", type: "string", required: true, description: "Note ID" },
         ],

@@ -539,9 +539,9 @@ All items in a cascade share the same `deletedAt` timestamp, enabling batch rest
 
 ```
 Delete all noteVersions where vaultId = vault._id
-Delete all auditLog entries where vaultId = vault._id
 Delete all notes where vaultId = vault._id
 Delete all folders where vaultId = vault._id
+Delete all auditLog entries where vaultId = vault._id
 Delete all vaultMembers where vaultId = vault._id
 Delete all apiKeys where vaultId = vault._id
 Delete the vault document
@@ -554,7 +554,7 @@ Delete the vault document
 | Function | Type | Parameters | Returns | Description |
 |----------|------|-----------|---------|-------------|
 | `auditLog.listByVault` | Query | `{ vaultId, limit? }` | `AuditEntry[]` | All entries for a vault, newest first |
-| `auditLog.listByTarget` | Query | `{ targetId }` | `AuditEntry[]` | All actions on a specific note/folder |
+| `auditLog.listByTarget` | Query | `{ targetId, vaultId }` | `AuditEntry[]` | All actions on a specific note/folder |
 
 ### Version History API
 

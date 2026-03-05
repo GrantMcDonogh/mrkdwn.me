@@ -108,7 +108,7 @@ Called by every mutation that modifies notes or folders. Not exported as a Conve
 | Function | Parameters | Returns | Description |
 |----------|-----------|---------|-------------|
 | `auditLog.listByVault` | `{ vaultId, limit? }` | `AuditEntry[]` | All entries for a vault, newest first. Default limit 100. |
-| `auditLog.listByTarget` | `{ targetId }` | `AuditEntry[]` | All actions on a specific note or folder, newest first. |
+| `auditLog.listByTarget` | `{ targetId, vaultId }` | `AuditEntry[]` | All actions on a specific note or folder, newest first. |
 
 Both queries require authentication and vault access (viewer+).
 
@@ -268,11 +268,11 @@ Displayed in the sidebar, toggled by a Trash button at the bottom. When active, 
 
 ### `vaults.remove` (`convex/vaults.ts`)
 
-When a vault is deleted, the cascade now also cleans up:
-- All `noteVersions` for the vault (via `by_vault` index)
-- All `auditLog` entries for the vault (via `by_vault` index)
+When a vault is deleted, the cascade also cleans up:
+- All `noteVersions` for the vault (via `by_vault` index) — deleted first
+- All `auditLog` entries for the vault (via `by_vault` index) — deleted after notes and folders
 
-These are deleted before the existing cascades for notes, folders, members, and API keys.
+Full cascade order: noteVersions → notes → folders → auditLog → vaultMembers → apiKeys → vault.
 
 ---
 

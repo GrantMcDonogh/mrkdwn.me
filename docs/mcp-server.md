@@ -66,7 +66,7 @@ mcp-server/
 | `create_folder` | Create a new folder | `name`, `parentId?` |
 | `rename_folder` | Rename a folder | `folderId`, `name` |
 | `move_folder` | Move a folder to a new parent | `folderId`, `parentId?` |
-| `delete_folder` | Delete a folder (children promoted) | `folderId` |
+| `delete_folder` | Delete a folder (cascading soft-delete of folder + descendants + contained notes) | `folderId` |
 
 ### Note Tools
 

@@ -62,7 +62,7 @@ export function registerFolderTools(server: McpServer) {
 
   server.tool(
     "delete_folder",
-    "Delete a folder (children are promoted to parent)",
+    "Delete a folder (cascading soft-delete of folder, descendants, and contained notes)",
     {
       folderId: z.string().describe("The folder ID"),
     },
