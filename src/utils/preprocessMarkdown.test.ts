@@ -83,6 +83,46 @@ describe("preprocessContent — tags", () => {
   });
 });
 
+// ---------- raw JSON blocks ----------
+
+describe("preprocessContent — raw JSON blocks", () => {
+  it("wraps a multi-line JSON object in a code fence", () => {
+    const input = '{\n  "key": "value"\n}';
+    const result = preprocessContent(input);
+    expect(result).toContain("```json");
+    expect(result).toContain('"key": "value"');
+  });
+
+  it("wraps a multi-line JSON array in a code fence", () => {
+    const input = '[\n  1,\n  2,\n  3\n]';
+    const result = preprocessContent(input);
+    expect(result).toContain("```json");
+    expect(result).toContain("1,");
+  });
+
+  it("does not wrap single-line JSON-like text", () => {
+    const input = '{"key": "value"}';
+    const result = preprocessContent(input);
+    expect(result).not.toContain("```json");
+  });
+
+  it("does not double-wrap JSON already in a code fence", () => {
+    const input = '```json\n{\n  "key": "value"\n}\n```';
+    const result = preprocessContent(input);
+    // Should only have one pair of fences
+    const fenceCount = (result.match(/```/g) || []).length;
+    expect(fenceCount).toBe(2);
+  });
+
+  it("wraps JSON that follows markdown text", () => {
+    const input = 'Here is some config:\n{\n  "name": "test"\n}\nEnd.';
+    const result = preprocessContent(input);
+    expect(result).toContain("```json");
+    expect(result).toContain('"name": "test"');
+    expect(result).toContain("End.");
+  });
+});
+
 // ---------- mixed content ----------
 
 describe("preprocessContent — mixed", () => {
