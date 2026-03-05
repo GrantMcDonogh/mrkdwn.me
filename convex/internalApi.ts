@@ -1,6 +1,8 @@
 import { internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
+import { logAudit } from "./auditLog";
+import { maybeCreateSnapshot } from "./noteVersions";
 
 // Auth-free internal functions called by httpActions after API key validation.
 // Each validates the resource belongs to the given vault (defense-in-depth).
@@ -34,6 +36,7 @@ export const createFolder = internalMutation({
     name: v.string(),
     vaultId: v.id("vaults"),
     parentId: v.optional(v.id("folders")),
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const siblings = await ctx.db
@@ -42,40 +45,70 @@ export const createFolder = internalMutation({
         q.eq("vaultId", args.vaultId).eq("parentId", args.parentId)
       )
       .collect();
-    return ctx.db.insert("folders", {
+    const id = await ctx.db.insert("folders", {
       name: args.name,
       vaultId: args.vaultId,
       parentId: args.parentId,
       order: siblings.filter((f) => f.isDeleted !== true).length,
     });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: args.userId ?? "api",
+      action: "create",
+      targetType: "folder",
+      targetId: id,
+      targetName: args.name,
+    });
+    return id;
   },
 });
 
 export const renameFolder = internalMutation({
-  args: { id: v.id("folders"), vaultId: v.id("vaults"), name: v.string() },
+  args: { id: v.id("folders"), vaultId: v.id("vaults"), name: v.string(), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.id);
     if (!folder || folder.vaultId !== args.vaultId) throw new Error("Folder not found");
+    const oldName = folder.name;
     await ctx.db.patch(args.id, { name: args.name });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: args.userId ?? "api",
+      action: "rename",
+      targetType: "folder",
+      targetId: args.id,
+      targetName: args.name,
+      metadata: { oldName, newName: args.name },
+    });
   },
 });
 
 export const moveFolder = internalMutation({
-  args: { id: v.id("folders"), vaultId: v.id("vaults"), parentId: v.optional(v.id("folders")) },
+  args: { id: v.id("folders"), vaultId: v.id("vaults"), parentId: v.optional(v.id("folders")), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.id);
     if (!folder || folder.vaultId !== args.vaultId) throw new Error("Folder not found");
+    const fromParent = folder.parentId ?? null;
     await ctx.db.patch(args.id, { parentId: args.parentId });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: args.userId ?? "api",
+      action: "move",
+      targetType: "folder",
+      targetId: args.id,
+      targetName: folder.name,
+      metadata: { fromParent, toParent: args.parentId ?? null },
+    });
   },
 });
 
 export const removeFolder = internalMutation({
-  args: { id: v.id("folders"), vaultId: v.id("vaults") },
+  args: { id: v.id("folders"), vaultId: v.id("vaults"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const folder = await ctx.db.get(args.id);
     if (!folder || folder.vaultId !== args.vaultId) throw new Error("Folder not found");
 
     const now = Date.now();
+    const actorId = args.userId ?? "api";
 
     // Collect all descendant folder IDs recursively
     async function getDescendantFolderIds(parentId: Id<"folders">): Promise<Id<"folders">[]> {
@@ -103,7 +136,7 @@ export const removeFolder = internalMutation({
       await ctx.db.patch(folderId, {
         isDeleted: true,
         deletedAt: now,
-        deletedBy: "api",
+        deletedBy: actorId,
       });
     }
 
@@ -117,13 +150,28 @@ export const removeFolder = internalMutation({
         .collect();
       for (const note of notes) {
         if (note.isDeleted === true) continue;
+        await maybeCreateSnapshot(ctx.db, {
+          noteId: note._id,
+          vaultId: args.vaultId,
+          userId: actorId,
+          trigger: "delete",
+        });
         await ctx.db.patch(note._id, {
           isDeleted: true,
           deletedAt: now,
-          deletedBy: "api",
+          deletedBy: actorId,
         });
       }
     }
+
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: actorId,
+      action: "delete",
+      targetType: "folder",
+      targetId: args.id,
+      targetName: folder.name,
+    });
   },
 });
 
@@ -154,6 +202,7 @@ export const createNote = internalMutation({
     title: v.string(),
     vaultId: v.id("vaults"),
     folderId: v.optional(v.id("folders")),
+    userId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const siblings = await ctx.db
@@ -163,7 +212,7 @@ export const createNote = internalMutation({
       )
       .collect();
     const now = Date.now();
-    return ctx.db.insert("notes", {
+    const id = await ctx.db.insert("notes", {
       title: args.title,
       content: "",
       vaultId: args.vaultId,
@@ -172,26 +221,58 @@ export const createNote = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: args.userId ?? "api",
+      action: "create",
+      targetType: "note",
+      targetId: id,
+      targetName: args.title,
+    });
+    return id;
   },
 });
 
 export const updateNote = internalMutation({
-  args: { id: v.id("notes"), vaultId: v.id("vaults"), content: v.string() },
+  args: { id: v.id("notes"), vaultId: v.id("vaults"), content: v.string(), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const note = await ctx.db.get(args.id);
     if (!note || note.vaultId !== args.vaultId) throw new Error("Note not found");
-    await ctx.db.patch(args.id, { content: args.content, updatedAt: Date.now() });
+    const actorId = args.userId ?? "api";
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: args.vaultId,
+      userId: actorId,
+      trigger: "auto",
+    });
+    await ctx.db.patch(args.id, { content: args.content, updatedAt: Date.now(), updatedBy: actorId });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: actorId,
+      action: "update",
+      targetType: "note",
+      targetId: args.id,
+      targetName: note.title,
+    });
   },
 });
 
 export const renameNote = internalMutation({
-  args: { id: v.id("notes"), vaultId: v.id("vaults"), title: v.string() },
+  args: { id: v.id("notes"), vaultId: v.id("vaults"), title: v.string(), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const note = await ctx.db.get(args.id);
     if (!note || note.vaultId !== args.vaultId) throw new Error("Note not found");
 
     const oldTitle = note.title;
     const newTitle = args.title;
+    const actorId = args.userId ?? "api";
+
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: args.vaultId,
+      userId: actorId,
+      trigger: "rename",
+    });
 
     await ctx.db.patch(args.id, { title: newTitle, updatedAt: Date.now() });
 
@@ -222,28 +303,69 @@ export const renameNote = internalMutation({
         }
       }
     }
+
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: actorId,
+      action: "rename",
+      targetType: "note",
+      targetId: args.id,
+      targetName: newTitle,
+      metadata: { oldTitle, newTitle },
+    });
   },
 });
 
 export const moveNote = internalMutation({
-  args: { id: v.id("notes"), vaultId: v.id("vaults"), folderId: v.optional(v.id("folders")) },
+  args: { id: v.id("notes"), vaultId: v.id("vaults"), folderId: v.optional(v.id("folders")), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const note = await ctx.db.get(args.id);
     if (!note || note.vaultId !== args.vaultId) throw new Error("Note not found");
+    const actorId = args.userId ?? "api";
+    const fromFolder = note.folderId ?? null;
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: args.vaultId,
+      userId: actorId,
+      trigger: "move",
+    });
     await ctx.db.patch(args.id, { folderId: args.folderId });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: actorId,
+      action: "move",
+      targetType: "note",
+      targetId: args.id,
+      targetName: note.title,
+      metadata: { fromFolder, toFolder: args.folderId ?? null },
+    });
   },
 });
 
 export const removeNote = internalMutation({
-  args: { id: v.id("notes"), vaultId: v.id("vaults") },
+  args: { id: v.id("notes"), vaultId: v.id("vaults"), userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const note = await ctx.db.get(args.id);
     if (!note || note.vaultId !== args.vaultId) throw new Error("Note not found");
-    // Soft delete
+    const actorId = args.userId ?? "api";
+    await maybeCreateSnapshot(ctx.db, {
+      noteId: args.id,
+      vaultId: args.vaultId,
+      userId: actorId,
+      trigger: "delete",
+    });
     await ctx.db.patch(args.id, {
       isDeleted: true,
       deletedAt: Date.now(),
-      deletedBy: "api",
+      deletedBy: actorId,
+    });
+    await logAudit(ctx.db, {
+      vaultId: args.vaultId,
+      userId: actorId,
+      action: "delete",
+      targetType: "note",
+      targetId: args.id,
+      targetName: note.title,
     });
   },
 });

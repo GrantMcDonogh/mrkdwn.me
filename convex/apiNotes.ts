@@ -56,6 +56,7 @@ export const createNote = apiKeyAction(async (ctx, request, auth) => {
     title,
     vaultId: auth.vaultId,
     folderId: folderId ? (folderId as Id<"folders">) : undefined,
+    userId: auth.userId,
   });
   return jsonOk(request, { id }, 201);
 });
@@ -69,6 +70,7 @@ export const updateNote = apiKeyAction(async (ctx, request, auth) => {
     id: id as Id<"notes">,
     vaultId: auth.vaultId,
     content,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });
@@ -82,6 +84,7 @@ export const renameNote = apiKeyAction(async (ctx, request, auth) => {
     id: id as Id<"notes">,
     vaultId: auth.vaultId,
     title,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });
@@ -95,6 +98,7 @@ export const moveNote = apiKeyAction(async (ctx, request, auth) => {
     id: id as Id<"notes">,
     vaultId: auth.vaultId,
     folderId: folderId ? (folderId as Id<"folders">) : undefined,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });
@@ -105,6 +109,7 @@ export const deleteNote = apiKeyAction(async (ctx, request, auth) => {
   await ctx.runMutation(internal.internalApi.removeNote, {
     id: param.value as Id<"notes">,
     vaultId: auth.vaultId,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });

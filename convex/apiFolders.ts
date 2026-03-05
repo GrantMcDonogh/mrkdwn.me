@@ -16,6 +16,7 @@ export const createFolder = apiKeyAction(async (ctx, request, auth) => {
     name,
     vaultId: auth.vaultId,
     parentId: parentId ? (parentId as Id<"folders">) : undefined,
+    userId: auth.userId,
   });
   return jsonOk(request, { id }, 201);
 });
@@ -29,6 +30,7 @@ export const renameFolder = apiKeyAction(async (ctx, request, auth) => {
     id: id as Id<"folders">,
     vaultId: auth.vaultId,
     name,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });
@@ -42,6 +44,7 @@ export const moveFolder = apiKeyAction(async (ctx, request, auth) => {
     id: id as Id<"folders">,
     vaultId: auth.vaultId,
     parentId: parentId ? (parentId as Id<"folders">) : undefined,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });
@@ -52,6 +55,7 @@ export const deleteFolder = apiKeyAction(async (ctx, request, auth) => {
   await ctx.runMutation(internal.internalApi.removeFolder, {
     id: param.value as Id<"folders">,
     vaultId: auth.vaultId,
+    userId: auth.userId,
   });
   return jsonOk(request, null);
 });
