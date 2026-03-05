@@ -55,7 +55,9 @@
       "mcp__plugin_playwright_playwright__browser_close",
       "Bash(npx:*)",
       "Bash(grep:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "mcp__plugin_playwright_playwright__browser_resize",
+      "mcp__plugin_playwright_playwright__browser_hover"
     ]
   },
   "mcpServers": {

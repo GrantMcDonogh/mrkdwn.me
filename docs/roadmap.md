@@ -10,9 +10,13 @@ A chronological record of every feature shipped in mrkdwn.me.
 Multi-vault architecture with Clerk authentication and Convex real-time backend.
 Each user can create multiple vaults, each containing its own notes and folder hierarchy.
 
+![Vault Selector](img/vault-selector.png)
+
 ### Markdown Editor (CodeMirror 6) — Feb 17, 2026
 Full-featured markdown editor built on CodeMirror 6 with syntax highlighting, live preview decorations, and auto-save.
 Supports headings, bold/italic, inline code, blockquotes, task checkboxes, horizontal rules, and tags — all rendered inline.
+
+![Editor Mode](img/editor-mode.png)
 
 ### File Explorer — Feb 17, 2026
 Sidebar file tree with nested folders, drag-and-drop reorganization, and context menus for rename/delete.
@@ -22,6 +26,8 @@ Notes and folders are displayed alphabetically with intuitive navigation.
 `[[Wiki Link]]` syntax with alias (`[[Title|Alias]]`) and heading (`[[Title#Heading]]`) support.
 Backlinks panel shows all notes linking to the current note, plus unlinked mentions of the note's title.
 
+![Backlinks Panel](img/backlinks-panel.png)
+
 ### Wiki Link Autocomplete — Feb 17, 2026
 Typing `[[` in the editor triggers a dropdown of matching note titles from the current vault.
 Filtered in real-time by substring matching as you type, with no network request (uses in-memory note list).
@@ -30,13 +36,21 @@ Filtered in real-time by substring matching as you type, with no network request
 Interactive force-directed graph visualization of all notes and their wiki link connections.
 Originally in the right panel, later moved to open as an editor tab for a larger canvas.
 
+![Graph View](img/graph-view.png)
+
 ### Search & Command Palette — Feb 17, 2026
 `Ctrl/Cmd + P` opens a fuzzy-search command palette for quickly finding and opening notes.
 Also provides access to app commands like toggling preview mode, exporting, and switching vaults.
 
+![Command Palette](img/command-palette.png)
+
+![Search Panel](img/search-panel.png)
+
 ### Workspace & Tabbed Layout — Feb 17, 2026
 Multi-tab workspace where each tab independently tracks its note and preview/edit mode.
 State managed via React Context + useReducer with actions for opening, closing, and reordering tabs.
+
+![Workspace Preview Mode](img/workspace-preview-mode.png)
 
 ### Authentication (Clerk) — Feb 17, 2026
 User authentication via Clerk with JWT validation on every Convex backend function.
@@ -86,6 +100,8 @@ Notes are created with the filename as the title and the file contents as markdo
 Chat with an LLM (via OpenRouter) to edit notes using natural language instructions.
 Shows a diff view of proposed changes before applying, with accept/reject controls.
 
+![AI Chat](img/ai-chat.png)
+
 ---
 
 ## Feb 24, 2026
@@ -93,6 +109,8 @@ Shows a diff view of proposed changes before applying, with accept/reject contro
 ### OpenRouter API Key Settings — Feb 24, 2026
 User settings dialog for entering and testing an OpenRouter API key.
 Includes a one-click test button that validates the key against the OpenRouter API.
+
+![Settings](img/settings.png)
 
 ### Public REST API v1 — Feb 24, 2026
 Full CRUD HTTP API for vaults, folders, and notes at `/api/v1/`.
@@ -130,6 +148,8 @@ Prevents orphaned folders caused by circular parent references.
 Interactive API docs available at `/docs` within the app, documenting all REST API v1 endpoints.
 Includes request/response examples, authentication details, and error codes.
 
+![API Documentation](img/api-docs.png)
+
 ---
 
 ## Mar 3, 2026
@@ -149,6 +169,8 @@ Longer responses are only produced when the user explicitly asks for detail.
 ### Vault Sharing — Mar 3, 2026
 Multi-user vault sharing with three roles: Owner, Editor, and Viewer. Owners invite collaborators by email; invitees see pending invitations on the vault selector and accept to gain access. Editors get full CRUD on notes and folders; viewers see everything read-only with the editor locked to preview mode. Shared vaults appear in a separate "Shared with You" section on the vault selector. Includes a sharing management dialog for owners, role badges throughout the UI, and permission-gated controls (file explorer, tab bar, command palette, drag-and-drop). Also fixes a security gap where the chat endpoints did not verify vault access.
 
+![Sharing Dialog](img/sharing-dialog.png)
+
 ### Chat Endpoint Security Fix — Mar 3, 2026
 The `/api/chat` and `/api/chat-edit` httpAction endpoints now verify the authenticated user has access to the requested vault before building context. Previously, any authenticated user who knew a vault ID could query its notes. Q&A mode requires viewer access; edit mode requires editor access.
 
@@ -160,6 +182,8 @@ The `/api/chat` and `/api/chat-edit` httpAction endpoints now verify the authent
 Every mutation that modifies notes or folders records an audit entry with user attribution, action type, target info, and metadata.
 Queryable by vault (newest first) or by specific target. Viewable from a toolbar button in a filterable modal dialog.
 
+![Audit Log](img/audit-log.png)
+
 ### Note Version History — Mar 4, 2026
 Automatic point-in-time snapshots of note content, throttled to max 1 per 5 minutes on content edits.
 Rename, move, and delete always create a snapshot. Versions are viewable and restorable from a right-panel History view.
@@ -167,3 +191,13 @@ Rename, move, and delete always create a snapshot. Versions are viewable and res
 ### Soft Delete & Trash — Mar 4, 2026
 Notes and folders are soft-deleted instead of permanently removed. Deleted items are retained for up to 5 years and appear in a Trash panel in the sidebar.
 Folder deletion cascades to all descendants. Items can be restored (editor+) or permanently deleted (owner only). A daily cron purges items older than 5 years.
+
+![Trash Panel](img/trash-panel.png)
+
+---
+
+## Mar 5, 2026
+
+### Audit Logging & Version History for REST API / MCP Server — Mar 5, 2026
+All mutations through the REST API v1 and MCP server now record audit log entries and create version snapshots, matching the behavior of the frontend.
+The API key owner's identity is used for user attribution. Internal mutations accept an optional `userId` parameter passed from the API auth layer.
