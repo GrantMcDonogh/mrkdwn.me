@@ -264,23 +264,23 @@ mrkdwn.me uses [Convex](https://convex.dev) as its backend platform, providing a
 
 **File:** `convex/internalApi.ts`
 
-Internal queries and mutations called by httpActions after API key validation. Each validates that the resource belongs to the given vault (defense-in-depth). These mirror the logic in `folders.ts` and `notes.ts` but skip `ctx.auth` checks.
+Internal queries and mutations called by httpActions after API key validation. Each validates that the resource belongs to the given vault (defense-in-depth). These mirror the logic in `folders.ts` and `notes.ts` but skip `ctx.auth` checks. All mutations call `logAudit()` and `maybeCreateSnapshot()` for full audit and version history coverage. Each mutation accepts an optional `userId` parameter (passed from the API key auth context); defaults to `"api"` if omitted.
 
 | Function | Type | Parameters | Description |
 |----------|------|-----------|-------------|
 | `internalApi.getVault` | Internal Query | `{ vaultId }` | Get vault name and createdAt |
 | `internalApi.listFolders` | Internal Query | `{ vaultId }` | List all active (non-deleted) folders in vault |
-| `internalApi.createFolder` | Internal Mutation | `{ name, vaultId, parentId? }` | Create folder |
-| `internalApi.renameFolder` | Internal Mutation | `{ id, vaultId, name }` | Rename folder (vault ownership check) |
-| `internalApi.moveFolder` | Internal Mutation | `{ id, vaultId, parentId? }` | Move folder |
-| `internalApi.removeFolder` | Internal Mutation | `{ id, vaultId }` | Cascading soft-delete folder + descendants |
+| `internalApi.createFolder` | Internal Mutation | `{ name, vaultId, parentId?, userId? }` | Create folder + audit log |
+| `internalApi.renameFolder` | Internal Mutation | `{ id, vaultId, name, userId? }` | Rename folder + audit log |
+| `internalApi.moveFolder` | Internal Mutation | `{ id, vaultId, parentId?, userId? }` | Move folder + audit log |
+| `internalApi.removeFolder` | Internal Mutation | `{ id, vaultId, userId? }` | Cascading soft-delete + snapshots + audit log |
 | `internalApi.listNotes` | Internal Query | `{ vaultId }` | List all active (non-deleted) notes in vault |
 | `internalApi.getNote` | Internal Query | `{ id, vaultId }` | Get note (vault ownership check) |
-| `internalApi.createNote` | Internal Mutation | `{ title, vaultId, folderId? }` | Create note |
-| `internalApi.updateNote` | Internal Mutation | `{ id, vaultId, content }` | Update note content |
-| `internalApi.renameNote` | Internal Mutation | `{ id, vaultId, title }` | Rename note + wiki link propagation |
-| `internalApi.moveNote` | Internal Mutation | `{ id, vaultId, folderId? }` | Move note |
-| `internalApi.removeNote` | Internal Mutation | `{ id, vaultId }` | Soft-delete note |
+| `internalApi.createNote` | Internal Mutation | `{ title, vaultId, folderId?, userId? }` | Create note + audit log |
+| `internalApi.updateNote` | Internal Mutation | `{ id, vaultId, content, userId? }` | Update note + snapshot + audit log |
+| `internalApi.renameNote` | Internal Mutation | `{ id, vaultId, title, userId? }` | Rename note + wiki links + snapshot + audit log |
+| `internalApi.moveNote` | Internal Mutation | `{ id, vaultId, folderId?, userId? }` | Move note + snapshot + audit log |
+| `internalApi.removeNote` | Internal Mutation | `{ id, vaultId, userId? }` | Soft-delete note + snapshot + audit log |
 | `internalApi.searchNotes` | Internal Query | `{ vaultId, query }` | Full-text search (title + content) |
 | `internalApi.getBacklinks` | Internal Query | `{ noteId, vaultId }` | Get backlinks |
 | `internalApi.getUnlinkedMentions` | Internal Query | `{ noteId, vaultId }` | Get unlinked mentions |

@@ -202,7 +202,7 @@ All queries that list notes or folders now exclude soft-deleted items:
 - `notes.getBacklinks` — excludes deleted notes
 - `notes.getUnlinkedMentions` — excludes deleted notes
 - `notes.rename` — skips wiki link propagation to deleted notes
-- Internal API mirrors the same filtering
+- Internal API mirrors the same filtering and audit logging
 
 ### Trash Backend (`convex/trash.ts`)
 
@@ -276,6 +276,27 @@ These are deleted before the existing cascades for notes, folders, members, and 
 
 ---
 
+
+## REST API & MCP Server Coverage
+
+All mutations in `convex/internalApi.ts` (which back the REST API v1 and MCP server) call `logAudit()` and `maybeCreateSnapshot()`, matching the behavior of the frontend mutations. The API key owner's Clerk `tokenIdentifier` is passed as the `userId` from the `auth` context provided by the `apiKeyAction` wrapper.
+
+Each internal mutation accepts an optional `userId` parameter. When called from `apiFolders.ts` or `apiNotes.ts`, this is set to `auth.userId`. If omitted (e.g. from import flows), it defaults to `"api"`.
+
+| Internal Mutation | Audit Action | Version Snapshot |
+|-------------------|-------------|-----------------|
+| `createFolder` | `create` | - |
+| `renameFolder` | `rename` (with `oldName`/`newName` metadata) | - |
+| `moveFolder` | `move` (with `fromParent`/`toParent` metadata) | - |
+| `removeFolder` | `delete` | Yes - for each contained note (trigger: `delete`) |
+| `createNote` | `create` | - |
+| `updateNote` | `update` | Yes (trigger: `auto`, 5-min throttle) |
+| `renameNote` | `rename` (with `oldTitle`/`newTitle` metadata) | Yes (trigger: `rename`) |
+| `moveNote` | `move` (with `fromFolder`/`toFolder` metadata) | Yes (trigger: `move`) |
+| `removeNote` | `delete` | Yes (trigger: `delete`) |
+
+---
+
 ## Permission Matrix
 
 | Action | Owner | Editor | Viewer |
@@ -324,7 +345,9 @@ These are deleted before the existing cascades for notes, folders, members, and 
 | `convex/schema.ts` | Added `auditLog`, `noteVersions` tables; soft-delete fields on `notes` and `folders` |
 | `convex/notes.ts` | Soft delete, audit logging, version snapshots, filtered queries |
 | `convex/folders.ts` | Cascading soft delete, audit logging, filtered queries |
-| `convex/internalApi.ts` | Mirrored soft-delete and filtering changes |
+| `convex/internalApi.ts` | Mirrored soft-delete, filtering, audit logging, and version snapshots |
+| `convex/apiFolders.ts` | Passes `userId` from API key auth to internal mutations |
+| `convex/apiNotes.ts` | Passes `userId` from API key auth to internal mutations |
 | `convex/vaults.ts` | Cascade to `noteVersions` and `auditLog` on vault delete |
 | `src/store/workspace.tsx` | Added `"history"` to `rightPanel` union |
 | `src/hooks/useVaultRole.ts` | Added `canPermanentDelete` flag |
