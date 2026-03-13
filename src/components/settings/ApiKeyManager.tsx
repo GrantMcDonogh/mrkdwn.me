@@ -6,9 +6,10 @@ import { Key, Trash2, Copy, Check, Plus } from "lucide-react";
 
 interface Props {
   vaultId: Id<"vaults">;
+  onKeyCreated?: (key: string) => void;
 }
 
-export default function ApiKeyManager({ vaultId }: Props) {
+export default function ApiKeyManager({ vaultId, onKeyCreated }: Props) {
   const keys = useQuery(api.apiKeys.list, { vaultId });
   const createKey = useAction(api.apiKeys.create);
   const revokeKey = useMutation(api.apiKeys.revoke);
@@ -26,6 +27,7 @@ export default function ApiKeyManager({ vaultId }: Props) {
     try {
       const result = await createKey({ vaultId, name: nameInput.trim() });
       setNewKey(result.key);
+      onKeyCreated?.(result.key);
       setNameInput("");
     } catch (err) {
       setError((err as Error).message);

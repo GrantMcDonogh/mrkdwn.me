@@ -100,6 +100,12 @@ The MCP server authenticates using a vault-scoped API key:
 | `MRKDWN_API_URL` | Convex site URL (e.g. `https://beaming-panda-407.convex.site`) |
 | `MRKDWN_API_KEY` | Vault-scoped API key (starts with `mk_`) |
 
+## Installation
+
+The MCP server is published as an npm package: [`mrkdwn-mcp-server`](https://www.npmjs.com/package/mrkdwn-mcp-server). No cloning or building required — `npx` handles download and execution.
+
+You can also generate a ready-to-copy config from the mrkdwn.me web app: **Settings → MCP Server Setup**.
+
 ## Setup
 
 ### For Claude Code
@@ -110,8 +116,8 @@ Add to `.claude/settings.json` (project or global):
 {
   "mcpServers": {
     "mrkdwn": {
-      "command": "node",
-      "args": ["path/to/mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "mrkdwn-mcp-server"],
       "env": {
         "MRKDWN_API_URL": "https://beaming-panda-407.convex.site",
         "MRKDWN_API_KEY": "mk_your_api_key_here"
@@ -123,14 +129,14 @@ Add to `.claude/settings.json` (project or global):
 
 ### For Claude Desktop
 
-Add to Claude Desktop's MCP configuration:
+Add to Claude Desktop's MCP configuration (`claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "mrkdwn": {
-      "command": "node",
-      "args": ["path/to/mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "mrkdwn-mcp-server"],
       "env": {
         "MRKDWN_API_URL": "https://beaming-panda-407.convex.site",
         "MRKDWN_API_KEY": "mk_your_api_key_here"

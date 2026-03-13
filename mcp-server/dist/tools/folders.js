@@ -34,7 +34,7 @@ export function registerFolderTools(server) {
             content: [{ type: "text", text: "Folder moved" }],
         };
     });
-    server.tool("delete_folder", "Delete a folder (children are promoted to parent)", {
+    server.tool("delete_folder", "Delete a folder (cascading soft-delete of folder, descendants, and contained notes)", {
         folderId: z.string().describe("The folder ID"),
     }, async ({ folderId }) => {
         await api.deleteFolder(folderId);

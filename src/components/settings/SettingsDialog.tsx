@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { X, Key, ExternalLink, BookOpen } from "lucide-react";
 import ApiKeyManager from "./ApiKeyManager";
+import McpSetup from "./McpSetup";
 import { useVaultRole } from "../../hooks/useVaultRole";
 
 interface Props {
@@ -25,6 +26,7 @@ export default function SettingsDialog({ onClose, vaultId }: Props) {
   const [errorMsg, setErrorMsg] = useState("");
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "valid" | "invalid">("idle");
   const [testError, setTestError] = useState("");
+  const [newApiKey, setNewApiKey] = useState<string | null>(null);
 
   const hasKey = keyStatus?.hasKey ?? false;
 
@@ -87,7 +89,7 @@ export default function SettingsDialog({ onClose, vaultId }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-obsidian-bg-secondary border border-obsidian-border rounded-lg shadow-2xl">
+      <div className="relative w-full max-w-lg bg-obsidian-bg-secondary border border-obsidian-border rounded-lg shadow-2xl max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-obsidian-border">
           <h2 className="text-sm font-semibold text-obsidian-text">Settings</h2>
@@ -100,7 +102,7 @@ export default function SettingsDialog({ onClose, vaultId }: Props) {
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto">
           <div>
             <label className="flex items-center gap-2 text-xs font-medium text-obsidian-text mb-2">
               <Key size={12} />
@@ -189,19 +191,25 @@ export default function SettingsDialog({ onClose, vaultId }: Props) {
           </div>
 
           {vaultId && canManage && (
-            <div className="border-t border-obsidian-border pt-4">
-              <ApiKeyManager vaultId={vaultId} />
-              <a
-                href="/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-3 text-xs text-obsidian-accent hover:underline"
-              >
-                <BookOpen size={12} />
-                View API Documentation
-                <ExternalLink size={10} />
-              </a>
-            </div>
+            <>
+              <div className="border-t border-obsidian-border pt-4">
+                <ApiKeyManager vaultId={vaultId} onKeyCreated={setNewApiKey} />
+                <a
+                  href="/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 mt-3 text-xs text-obsidian-accent hover:underline"
+                >
+                  <BookOpen size={12} />
+                  View API Documentation
+                  <ExternalLink size={10} />
+                </a>
+              </div>
+
+              <div className="border-t border-obsidian-border pt-4">
+                <McpSetup apiKey={newApiKey} />
+              </div>
+            </>
           )}
         </div>
       </div>

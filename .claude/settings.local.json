@@ -58,7 +58,8 @@
       "Bash(python3:*)",
       "mcp__plugin_playwright_playwright__browser_resize",
       "mcp__plugin_playwright_playwright__browser_hover",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm view:*)"
     ]
   },
   "mcpServers": {
