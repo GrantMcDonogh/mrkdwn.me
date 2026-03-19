@@ -6,6 +6,7 @@ import type { Components } from "react-markdown";
 import type { EditBlock } from "../../lib/parseEditBlocks";
 import { stripEditBlocks } from "../../lib/parseEditBlocks";
 import EditBlockCard from "./EditBlockCard";
+import MermaidDiagram from "../editor/MermaidDiagram";
 import { preprocessContent } from "../../utils/preprocessMarkdown";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -43,6 +44,13 @@ export default function ChatMessage({
 
   const components: Components = useMemo(
     () => ({
+      code: ({ className, children }) => {
+        if (className === "language-mermaid") {
+          const chart = String(children).replace(/\n$/, "");
+          return <MermaidDiagram chart={chart} />;
+        }
+        return <code className={className}>{children}</code>;
+      },
       a: ({ href, children }) => {
         if (href?.startsWith("wikilink://")) {
           const title = decodeURIComponent(href.replace("wikilink://", ""));

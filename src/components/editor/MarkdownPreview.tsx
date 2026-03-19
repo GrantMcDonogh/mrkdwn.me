@@ -7,6 +7,7 @@ import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
 import type { Id } from "../../../convex/_generated/dataModel";
 import LinkPreviewPopup from "./LinkPreviewPopup";
+import MermaidDiagram from "./MermaidDiagram";
 import { preprocessContent } from "../../utils/preprocessMarkdown";
 
 interface Props {
@@ -105,6 +106,13 @@ export default function MarkdownPreview({ noteId, onSwitchToEdit }: Props) {
             {children}
           </a>
         );
+      },
+      code: ({ className, children }) => {
+        if (className === "language-mermaid") {
+          const chart = String(children).replace(/\n$/, "");
+          return <MermaidDiagram chart={chart} />;
+        }
+        return <code className={className}>{children}</code>;
       },
       input: ({ checked, ...props }) => (
         <input {...props} checked={checked} disabled type="checkbox" />
