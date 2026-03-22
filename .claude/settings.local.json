@@ -59,7 +59,13 @@
       "mcp__plugin_playwright_playwright__browser_resize",
       "mcp__plugin_playwright_playwright__browser_hover",
       "Bash(node:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "mcp__mrkdwn__list_folders",
+      "mcp__mrkdwn__list_notes",
+      "mcp__mrkdwn__search_notes",
+      "mcp__mrkdwn__create_folder",
+      "mcp__mrkdwn__create_note",
+      "mcp__mrkdwn__update_note"
     ]
   },
   "mcpServers": {
