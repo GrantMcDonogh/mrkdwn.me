@@ -20,7 +20,7 @@ export const chatEdit = httpAction(async (ctx, request) => {
       return new Response("Unauthorized", { status: 401, headers: corsHeaders });
     }
 
-    const { vaultId, message, activeNoteId } = await request.json();
+    const { vaultId, message, activeNoteId, history } = await request.json();
     if (!vaultId || !message) {
       return new Response("Missing vaultId or message", {
         status: 400,
@@ -113,6 +113,13 @@ When the user asks you to create a new note, output:
           stream: true,
           messages: [
             { role: "system", content: systemPrompt },
+            // Include conversation history for multi-turn context
+            ...((history as { role: string; content: string }[]) ?? []).map(
+              (msg: { role: string; content: string }) => ({
+                role: msg.role as "user" | "assistant",
+                content: msg.content,
+              })
+            ),
             {
               role: "user",
               content: `Question: ${message}\n\nVault notes:\n${contextData.context}`,

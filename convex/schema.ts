@@ -96,6 +96,23 @@ export default defineSchema({
     .index("by_note", ["noteId", "savedAt"])
     .index("by_vault", ["vaultId", "savedAt"]),
 
+  chatSessions: defineTable({
+    vaultId: v.id("vaults"),
+    userId: v.string(),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_vault_user", ["vaultId", "userId", "updatedAt"]),
+
+  chatMessages: defineTable({
+    sessionId: v.id("chatSessions"),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_session", ["sessionId", "createdAt"]),
+
   apiKeys: defineTable({
     keyHash: v.string(),
     keyPrefix: v.string(),

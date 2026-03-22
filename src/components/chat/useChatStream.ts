@@ -1,5 +1,8 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { parseEditBlocks, type EditBlock } from "../../lib/parseEditBlocks";
 
 export interface ChatMessage {
@@ -13,25 +16,89 @@ interface SendOptions {
   useEditEndpoint?: boolean;
 }
 
-export function useChatStream() {
+export function useChatStream(vaultId: Id<"vaults">) {
   const { getToken } = useAuth();
+  const [sessionId, setSessionId] = useState<Id<"chatSessions"> | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  const sessions = useQuery(api.chatSessions.list, { vaultId });
+  const storedMessages = useQuery(
+    api.chatSessions.getMessages,
+    sessionId ? { sessionId } : "skip"
+  );
+  const createSession = useMutation(api.chatSessions.create);
+  const removeSession = useMutation(api.chatSessions.remove);
+  const saveMessageMut = useMutation(api.chatSessions.saveMessage);
+
+  // Sync stored messages into local state when session changes (and not streaming)
+  useEffect(() => {
+    if (storedMessages && !isStreaming) {
+      setMessages(
+        storedMessages.map((m) => ({ role: m.role, content: m.content }))
+      );
+    }
+  }, [storedMessages, isStreaming]);
+
+  const selectSession = useCallback((id: Id<"chatSessions">) => {
+    setSessionId(id);
+    setMessages([]);
+  }, []);
+
+  const startNewSession = useCallback(async () => {
+    const id = await createSession({ vaultId });
+    setSessionId(id);
+    setMessages([]);
+    return id;
+  }, [createSession, vaultId]);
+
+  const deleteSession = useCallback(
+    async (id: Id<"chatSessions">) => {
+      await removeSession({ sessionId: id });
+      if (id === sessionId) {
+        setSessionId(null);
+        setMessages([]);
+      }
+    },
+    [removeSession, sessionId]
+  );
+
   const sendMessage = useCallback(
-    async (vaultId: string, message: string, options?: SendOptions) => {
+    async (message: string, options?: SendOptions) => {
       if (isStreaming) return;
 
-      // Add user message
+      // Auto-create session if none active
+      let activeSessionId = sessionId;
+      if (!activeSessionId) {
+        activeSessionId = await createSession({ vaultId });
+        setSessionId(activeSessionId);
+      }
+
+      // Add user message to local state
       setMessages((prev) => [...prev, { role: "user", content: message }]);
       setIsStreaming(true);
+
+      // Save user message to DB
+      await saveMessageMut({
+        sessionId: activeSessionId,
+        role: "user",
+        content: message,
+      });
+
+      // Build history from current messages (before this new one)
+      // Limit to last 20 messages to avoid huge payloads
+      const history = messages.slice(-20).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
       // Add empty assistant message for streaming
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
+      let fullResponse = "";
+
       try {
-        // Get the Convex site URL from the deployment URL
         const convexUrl = import.meta.env.VITE_CONVEX_URL as string;
         const siteUrl = convexUrl.replace(".cloud", ".site");
 
@@ -43,7 +110,7 @@ export function useChatStream() {
           ? `${siteUrl}/api/chat-edit`
           : `${siteUrl}/api/chat`;
 
-        const body: Record<string, unknown> = { vaultId, message };
+        const body: Record<string, unknown> = { vaultId, message, history };
         if (options?.useEditEndpoint && options.activeNoteId) {
           body.activeNoteId = options.activeNoteId;
         }
@@ -66,14 +133,16 @@ export function useChatStream() {
           } catch {
             errorText = await response.text();
           }
+          const errorContent = `Error: ${errorText}`;
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {
               role: "assistant",
-              content: `Error: ${errorText}`,
+              content: errorContent,
             };
             return updated;
           });
+          fullResponse = errorContent;
           return;
         }
 
@@ -86,6 +155,7 @@ export function useChatStream() {
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
+          fullResponse += chunk;
           setMessages((prev) => {
             const updated = [...prev];
             const last = updated[updated.length - 1]!;
@@ -111,21 +181,31 @@ export function useChatStream() {
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
+          const errorContent = `Error: ${(err as Error).message}`;
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {
               role: "assistant",
-              content: `Error: ${(err as Error).message}`,
+              content: errorContent,
             };
             return updated;
           });
+          fullResponse = errorContent;
         }
       } finally {
+        // Save the assistant response to DB
+        if (fullResponse && activeSessionId) {
+          await saveMessageMut({
+            sessionId: activeSessionId,
+            role: "assistant",
+            content: fullResponse,
+          });
+        }
         setIsStreaming(false);
         abortRef.current = null;
       }
     },
-    [getToken, isStreaming]
+    [getToken, isStreaming, vaultId, sessionId, messages, createSession, saveMessageMut]
   );
 
   const updateBlockStatus = useCallback(
@@ -144,8 +224,21 @@ export function useChatStream() {
   );
 
   const clearMessages = useCallback(() => {
+    setSessionId(null);
     setMessages([]);
   }, []);
 
-  return { messages, isStreaming, sendMessage, clearMessages, updateBlockStatus };
+  return {
+    messages,
+    isStreaming,
+    sendMessage,
+    clearMessages,
+    updateBlockStatus,
+    // Session management
+    sessions: sessions ?? [],
+    sessionId,
+    selectSession,
+    startNewSession,
+    deleteSession,
+  };
 }

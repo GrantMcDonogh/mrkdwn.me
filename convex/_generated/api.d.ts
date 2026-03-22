@@ -19,6 +19,7 @@ import type * as chat from "../chat.js";
 import type * as chatEdit from "../chatEdit.js";
 import type * as chatEditHelpers from "../chatEditHelpers.js";
 import type * as chatHelpers from "../chatHelpers.js";
+import type * as chatSessions from "../chatSessions.js";
 import type * as crons from "../crons.js";
 import type * as folders from "../folders.js";
 import type * as http from "../http.js";
@@ -51,6 +52,7 @@ declare const fullApi: ApiFromModules<{
   chatEdit: typeof chatEdit;
   chatEditHelpers: typeof chatEditHelpers;
   chatHelpers: typeof chatHelpers;
+  chatSessions: typeof chatSessions;
   crons: typeof crons;
   folders: typeof folders;
   http: typeof http;

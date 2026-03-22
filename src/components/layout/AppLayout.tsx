@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useWorkspace } from "../../store/workspace";
@@ -43,6 +43,8 @@ export default function AppLayout() {
   const [showSettings, setShowSettings] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(288); // 18rem = 288px
+  const rightPanelDragging = useRef(false);
 
   // Detect access revocation — vault query returns error/null for revoked users
   useEffect(() => {
@@ -50,6 +52,23 @@ export default function AppLayout() {
       dispatch({ type: "LEAVE_VAULT" });
     }
   }, [state.vaultId, vault, dispatch]);
+
+  const handleRightPanelResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    rightPanelDragging.current = true;
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (!rightPanelDragging.current) return;
+      const newWidth = window.innerWidth - moveEvent.clientX;
+      setRightPanelWidth(Math.max(200, Math.min(600, newWidth)));
+    };
+    const onMouseUp = () => {
+      rightPanelDragging.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -269,9 +288,18 @@ export default function AppLayout() {
 
         {/* Right panel */}
         {state.rightPanel && (
-          <div className="w-72 border-l border-obsidian-border bg-obsidian-bg-secondary overflow-y-auto">
-            {renderRightPanel()}
-          </div>
+          <>
+            <div
+              onMouseDown={handleRightPanelResize}
+              className="w-1 shrink-0 cursor-col-resize bg-obsidian-border hover:bg-obsidian-accent transition-colors"
+            />
+            <div
+              style={{ width: rightPanelWidth }}
+              className="shrink-0 bg-obsidian-bg-secondary overflow-y-auto"
+            >
+              {renderRightPanel()}
+            </div>
+          </>
         )}
       </div>
 

@@ -21,7 +21,7 @@ export const chat = httpAction(async (ctx, request) => {
     return new Response("Unauthorized", { status: 401, headers: corsHeaders });
   }
 
-  const { vaultId, message } = await request.json();
+  const { vaultId, message, history } = await request.json();
   if (!vaultId || !message) {
     return new Response("Missing vaultId or message", {
       status: 400,
@@ -85,6 +85,13 @@ export const chat = httpAction(async (ctx, request) => {
         'If the notes don\'t contain relevant information, say "I don\'t have enough information in your notes to answer that." ' +
         "Use markdown formatting.",
       messages: [
+        // Include conversation history for multi-turn context
+        ...((history as { role: string; content: string }[]) ?? []).map(
+          (msg: { role: string; content: string }) => ({
+            role: msg.role as "user" | "assistant",
+            content: msg.content,
+          })
+        ),
         {
           role: "user",
           content: `Question: ${message}\n\nVault notes:\n${contextData.context}`,
