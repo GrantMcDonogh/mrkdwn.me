@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { parseEditBlocks, type EditBlock } from "../../lib/parseEditBlocks";
@@ -18,33 +18,43 @@ interface SendOptions {
 
 export function useChatStream(vaultId: Id<"vaults">) {
   const { getToken } = useAuth();
+  const convex = useConvex();
   const [sessionId, setSessionId] = useState<Id<"chatSessions"> | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const sessions = useQuery(api.chatSessions.list, { vaultId });
-  const storedMessages = useQuery(
-    api.chatSessions.getMessages,
-    sessionId ? { sessionId } : "skip"
-  );
   const createSession = useMutation(api.chatSessions.create);
   const removeSession = useMutation(api.chatSessions.remove);
   const saveMessageMut = useMutation(api.chatSessions.saveMessage);
 
-  // Sync stored messages into local state when session changes (and not streaming)
-  useEffect(() => {
-    if (storedMessages && !isStreaming) {
+  // Imperatively load messages for a session (no reactive useEffect)
+  const loadSessionMessages = useCallback(
+    async (sid: Id<"chatSessions">) => {
+      const stored = await convex.query(api.chatSessions.getMessages, { sessionId: sid });
       setMessages(
-        storedMessages.map((m) => ({ role: m.role, content: m.content }))
+        stored.map((m) => {
+          const msg: ChatMessage = { role: m.role, content: m.content };
+          if (m.role === "assistant") {
+            const blocks = parseEditBlocks(m.content);
+            if (blocks.length > 0) msg.editBlocks = blocks;
+          }
+          return msg;
+        })
       );
-    }
-  }, [storedMessages, isStreaming]);
+    },
+    [convex]
+  );
 
-  const selectSession = useCallback((id: Id<"chatSessions">) => {
-    setSessionId(id);
-    setMessages([]);
-  }, []);
+  const selectSession = useCallback(
+    async (id: Id<"chatSessions">) => {
+      setSessionId(id);
+      setMessages([]);
+      await loadSessionMessages(id);
+    },
+    [loadSessionMessages]
+  );
 
   const startNewSession = useCallback(async () => {
     const id = await createSession({ vaultId });
@@ -169,15 +179,15 @@ export function useChatStream(vaultId: Id<"vaults">) {
 
         // After streaming completes, parse edit blocks if using edit endpoint
         if (options?.useEditEndpoint) {
-          setMessages((prev) => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1]!;
-            const blocks = parseEditBlocks(last.content);
-            if (blocks.length > 0) {
+          const blocks = parseEditBlocks(fullResponse);
+          if (blocks.length > 0) {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1]!;
               updated[updated.length - 1] = { ...last, editBlocks: blocks };
-            }
-            return updated;
-          });
+              return updated;
+            });
+          }
         }
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
