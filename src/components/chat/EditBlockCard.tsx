@@ -81,7 +81,7 @@ export default function EditBlockCard({ block, vaultId, onStatusChange }: Props)
       </div>
 
       {/* Diff */}
-      <div className="p-2">
+      <div className="p-2 max-h-64 overflow-y-auto">
         <DiffView
           original={block.type === "edit" ? (matchedNote?.content ?? "") : ""}
           proposed={block.content}
