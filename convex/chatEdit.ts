@@ -109,7 +109,7 @@ When the user asks you to create a new note, output:
         },
         body: JSON.stringify({
           model: "anthropic/claude-sonnet-4",
-          max_tokens: 4096,
+          max_tokens: 16384,
           stream: true,
           messages: [
             { role: "system", content: systemPrompt },
