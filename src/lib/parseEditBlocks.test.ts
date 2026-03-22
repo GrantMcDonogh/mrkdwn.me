@@ -156,6 +156,69 @@ describe("parseEditBlocks", () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.content).toBe("");
   });
+
+  it("auto-closes truncated edit block (max token cutoff)", () => {
+    const text = [
+      "I'll create that for you:",
+      "````edit:Daily Log",
+      "# Daily Log",
+      "- Task 1",
+      "- Task 2",
+      "- Task 3",
+      // No closing ```` — simulates max token cutoff
+    ].join("\n");
+
+    const blocks = parseEditBlocks(text);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.type).toBe("edit");
+    expect(blocks[0]!.noteTitle).toBe("Daily Log");
+    expect(blocks[0]!.content).toContain("- Task 1");
+    expect(blocks[0]!.content).toContain("- Task 3");
+  });
+
+  it("auto-closes truncated create block", () => {
+    const text = [
+      "Here's the note:",
+      "````create:New Book",
+      "# Chapter 1",
+      "Some content here",
+    ].join("\n");
+
+    const blocks = parseEditBlocks(text);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.type).toBe("create");
+    expect(blocks[0]!.noteTitle).toBe("New Book");
+    expect(blocks[0]!.content).toContain("# Chapter 1");
+  });
+
+  it("does not double-close already closed blocks", () => {
+    const text = [
+      "````edit:Note A",
+      "content a",
+      "````",
+    ].join("\n");
+
+    const blocks = parseEditBlocks(text);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.content).toBe("content a\n");
+  });
+
+  it("handles mix of closed and truncated blocks", () => {
+    const text = [
+      "````edit:Note A",
+      "content a",
+      "````",
+      "And also:",
+      "````create:Note B",
+      "content b that got cut off",
+    ].join("\n");
+
+    const blocks = parseEditBlocks(text);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]!.noteTitle).toBe("Note A");
+    expect(blocks[1]!.noteTitle).toBe("Note B");
+    expect(blocks[1]!.content).toContain("content b that got cut off");
+  });
 });
 
 // ---------- stripEditBlocks ----------
