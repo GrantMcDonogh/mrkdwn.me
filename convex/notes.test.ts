@@ -88,6 +88,36 @@ describe("notes soft delete", () => {
   });
 });
 
+describe("soft delete preserves data for recovery", () => {
+  it("preserves note title and content after soft delete", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser, vaultId } = await setupVault(t);
+    const noteId = await asUser.mutation(api.notes.create, { title: "Precious Data", vaultId });
+    await asUser.mutation(api.notes.update, { id: noteId, content: "# Very important content\n\nDo not lose this." });
+
+    await asUser.mutation(api.notes.remove, { id: noteId });
+
+    const deleted = await asUser.query(api.notes.get, { id: noteId });
+    expect(deleted.isDeleted).toBe(true);
+    expect(deleted.title).toBe("Precious Data");
+    expect(deleted.content).toBe("# Very important content\n\nDo not lose this.");
+  });
+
+  it("creates a version snapshot before soft delete", async () => {
+    const t = convexTest(schema, modules);
+    const { asUser, vaultId } = await setupVault(t);
+    const noteId = await asUser.mutation(api.notes.create, { title: "Snapshotted", vaultId });
+    await asUser.mutation(api.notes.update, { id: noteId, content: "content before delete" });
+
+    await asUser.mutation(api.notes.remove, { id: noteId });
+
+    const versions = await asUser.query(api.noteVersions.listByNote, { noteId });
+    const deleteVersion = versions.find((v: { trigger: string }) => v.trigger === "delete");
+    expect(deleteVersion).toBeDefined();
+    expect(deleteVersion!.content).toBe("content before delete");
+  });
+});
+
 describe("notes updatedBy tracking", () => {
   it("sets updatedBy on content update", async () => {
     const t = convexTest(schema, modules);

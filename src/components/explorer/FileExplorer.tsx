@@ -328,6 +328,7 @@ export default function FileExplorer() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!confirm(`Move "${folder.name}" and its contents to trash?`)) return;
                     removeFolder({ id: folder._id });
                   }}
                   className="p-0.5 rounded hover:bg-obsidian-bg-tertiary text-obsidian-text-muted hover:text-red-400"
@@ -414,6 +415,7 @@ export default function FileExplorer() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!confirm(`Move "${note.title}" to trash?`)) return;
                   for (const pane of state.panes) {
                     for (const tab of pane.tabs) {
                       if (tab.noteId === note._id) {
